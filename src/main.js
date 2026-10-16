@@ -4,7 +4,40 @@ import { adminPage, loadAdminPanel } from './admin.js';
 
 const app = document.querySelector('#app');
 const productOrder = products.map((product) => product.id);
-const state = { cart: [], menuOpen: false, toast: '', selectedCategory: 'All fans', sort: 'Featured', query: '' };
+
+const CART_STORAGE_KEY = 'maqsood_cart';
+
+function loadSavedCart() {
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => {
+        const prod = findProduct(item.id || item.product?.id) || item.product;
+        return prod ? { product: prod, qty: Math.max(1, Number(item.qty || 1)) } : null;
+      }).filter(Boolean);
+    }
+  } catch (err) {
+    console.warn('Could not read cart from localStorage:', err);
+  }
+  return [];
+}
+
+function saveCartToStorage() {
+  try {
+    const data = state.cart.map((item) => ({
+      id: item.product.id,
+      qty: item.qty,
+      product: item.product
+    }));
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn('Could not save cart to localStorage:', err);
+  }
+}
+
+const state = { cart: loadSavedCart(), menuOpen: false, toast: '', selectedCategory: 'All fans', sort: 'Featured', query: '' };
 let catalogHydrated = false;
 const DEMO_WHATSAPP_NUMBER = '923234464246';
 const whatsappUrl = (message) => `https://wa.me/${DEMO_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
@@ -96,7 +129,7 @@ function productPage(id) {
 
 function cartPage() {
   const total = state.cart.reduce((sum, item) => sum + item.product.price * item.qty, 0);
-  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><span>Your Cart</span></div><span class="eyebrow">YOUR SELECTION</span><h1>Your Cart <small>(${state.cart.reduce((sum, i) => sum + i.qty, 0)} items)</small></h1></div></div><section class="content-section cart-section"><div class="content-wrap">${state.cart.length ? `<div class="cart-layout"><div class="cart-items"><div class="cart-table-head"><span>Product</span><span>Price</span><span>Quantity</span><span>Total</span><span></span></div>${state.cart.map((item) => `<div class="cart-item"><div class="cart-product"><img src="${item.product.image}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} · ${item.product.color}</small></div></div><span>${formatPrice(item.product.price)}</span><div class="quantity-control"><button data-cart-qty="minus" data-id="${item.product.id}" aria-label="Decrease quantity">${icon('minus', 14)}</button><span>${item.qty}</span><button data-cart-qty="plus" data-id="${item.product.id}" aria-label="Increase quantity">${icon('plus', 14)}</button></div><b>${formatPrice(item.product.price * item.qty)}</b><button class="remove-button" data-remove="${item.product.id}" aria-label="Remove ${item.product.name}">${icon('trash', 17)}</button></div>`).join('')}<a class="continue-link" href="/products" data-link>${icon('arrow', 15)} Continue shopping</a></div><aside class="summary-card"><span class="eyebrow">ORDER SUMMARY</span><h2>Bring comfort home.</h2><div class="summary-line"><span>Subtotal</span><b>${formatPrice(total)}</b></div><div class="summary-line"><span>Delivery</span><b class="green">Free</b></div><div class="summary-total"><span>Total</span><b>${formatPrice(total)}</b></div><a class="button button-gold full" href="/checkout" data-link>Proceed to Checkout ${icon('arrow', 16)}</a><small class="summary-note">No payment is collected in this demo. Checkout is for presentation only.</small></aside></div>` : `<div class="empty-cart"><div class="empty-icon">${icon('cart', 35)}</div><span class="eyebrow">NOTHING HERE YET</span><h2>Your cart is waiting for a little comfort.</h2><p>Browse our collection and add a fan that feels right for your home.</p><a href="/products" data-link class="button button-dark">Explore fans ${icon('arrow', 16)}</a></div>`}</div></section></main>${footer()}`;
+  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><span>Your Cart</span></div><span class="eyebrow">YOUR SELECTION</span><h1>Your Cart <small>(${state.cart.reduce((sum, i) => sum + i.qty, 0)} items)</small></h1></div></div><section class="content-section cart-section"><div class="content-wrap">${state.cart.length ? `<div class="cart-layout"><div class="cart-items"><div class="cart-table-head"><span>Product</span><span>Price</span><span>Quantity</span><span>Total</span><span></span></div>${state.cart.map((item) => `<div class="cart-item"><div class="cart-product"><img src="${item.product.image}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} · ${item.product.color}</small></div></div><span>${formatPrice(item.product.price)}</span><div class="quantity-control"><button data-cart-qty="minus" data-id="${item.product.id}" aria-label="Decrease quantity">${icon('minus', 14)}</button><span>${item.qty}</span><button data-cart-qty="plus" data-id="${item.product.id}" aria-label="Increase quantity">${icon('plus', 14)}</button></div><b>${formatPrice(item.product.price * item.qty)}</b><button class="remove-button" data-remove="${item.product.id}" aria-label="Remove ${item.product.name}">${icon('trash', 17)}</button></div>`).join('')}<a class="continue-link" href="/products" data-link>${icon('arrow', 15)} Continue shopping</a></div><aside class="summary-card"><span class="eyebrow">ORDER SUMMARY</span><h2>Bring comfort home.</h2><div class="summary-line"><span>Subtotal</span><b>${formatPrice(total)}</b></div><div class="summary-line"><span>Delivery</span><b class="green">Free</b></div><div class="summary-line"><span>Cart status</span><b class="green">Saved in browser</b></div><div class="summary-total"><span>Total</span><b>${formatPrice(total)}</b></div><a class="button button-gold full" href="/checkout" data-link>Proceed to Checkout ${icon('arrow', 16)}</a><small class="summary-note">No payment is collected in this demo. Checkout is for presentation only.</small></aside></div>` : `<div class="empty-cart"><div class="empty-icon">${icon('cart', 35)}</div><span class="eyebrow">NOTHING HERE YET</span><h2>Your cart is waiting for a little comfort.</h2><p>Browse our collection and add a fan that feels right for your home.</p><a href="/products" data-link class="button button-dark">Explore fans ${icon('arrow', 16)}</a></div>`}</div></section></main>${footer()}`;
 }
 
 function checkoutPage() {
@@ -155,12 +188,14 @@ function showToast(message) {
 
 function addToCart(id, quantity = 1) {
   const product = findProduct(id);
+  if (!product) return;
   if (product.stockStatus === 'out_of_stock') { showToast(`${product.name} is currently sold out`); return; }
   const item = state.cart.find((entry) => entry.product.id === id);
   if (item) item.qty += quantity;
   else state.cart.push({ product, qty: quantity });
+  saveCartToStorage();
   render();
-  showToast(`${product.name} added to your cart`);
+  showToast(`${product.name} saved to your cart`);
 }
 
 function bindEvents() {
@@ -226,8 +261,20 @@ function bindEvents() {
   document.querySelectorAll('[data-filter-clear]').forEach((button) => button.addEventListener('click', () => { state.selectedCategory = 'All fans'; state.query = ''; render(); }));
   document.querySelectorAll('input[name="category"]').forEach((input) => input.addEventListener('change', (event) => { state.selectedCategory = event.target.value; render(); }));
   document.querySelector('#sort-select')?.addEventListener('change', (event) => { state.sort = event.target.value; if (event.target.value.includes('low')) products.sort((a, b) => a.price - b.price); else if (event.target.value.includes('high')) products.sort((a, b) => b.price - a.price); else products.sort((a, b) => productOrder.indexOf(a.id) - productOrder.indexOf(b.id)); render(); });
-  document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => { state.cart = state.cart.filter((item) => item.product.id !== button.dataset.remove); render(); showToast('Item removed from cart'); }));
-  document.querySelectorAll('[data-cart-qty]').forEach((button) => button.addEventListener('click', () => { const item = state.cart.find((entry) => entry.product.id === button.dataset.id); if (!item) return; item.qty += button.dataset.cartQty === 'plus' ? 1 : -1; if (item.qty < 1) state.cart = state.cart.filter((entry) => entry.product.id !== button.dataset.id); render(); }));
+  document.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => {
+    state.cart = state.cart.filter((item) => item.product.id !== button.dataset.remove);
+    saveCartToStorage();
+    render();
+    showToast('Item removed from cart');
+  }));
+  document.querySelectorAll('[data-cart-qty]').forEach((button) => button.addEventListener('click', () => {
+    const item = state.cart.find((entry) => entry.product.id === button.dataset.id);
+    if (!item) return;
+    item.qty += button.dataset.cartQty === 'plus' ? 1 : -1;
+    if (item.qty < 1) state.cart = state.cart.filter((entry) => entry.product.id !== button.dataset.id);
+    saveCartToStorage();
+    render();
+  }));
   document.querySelectorAll('[data-detail-qty]').forEach((button) => button.addEventListener('click', () => { const qty = document.querySelector('#detail-qty'); let value = Number(qty.textContent); value += button.dataset.detailQty === 'plus' ? 1 : -1; qty.textContent = Math.max(1, value); }));
   document.querySelector('#checkout-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -251,6 +298,11 @@ async function hydrateCatalog() {
     const remoteProducts = await response.json();
     if (remoteProducts.length) {
       products.splice(0, products.length, ...remoteProducts);
+      state.cart = state.cart.map((item) => {
+        const fresh = findProduct(item.product.id) || item.product;
+        return { product: fresh, qty: item.qty };
+      });
+      saveCartToStorage();
       const reviewsResponse = await fetch('/api/reviews');
       if (reviewsResponse.ok) {
         const remoteReviews = await reviewsResponse.json();
