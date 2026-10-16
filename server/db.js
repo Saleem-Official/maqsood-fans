@@ -1,0 +1,33 @@
+import mysql from 'mysql2/promise';
+import { products as seedProducts, reviewsByProduct } from '../src/data.js';
+
+let pool;
+export function getPool() {
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not configured');
+  if (!pool) pool = mysql.createPool(process.env.DATABASE_URL);
+  return pool;
+}
+
+export async function initDb() {
+  if (!process.env.DATABASE_URL) return;
+  const db = getPool();
+  await db.query(`CREATE TABLE IF NOT EXISTS products (id VARCHAR(80) PRIMARY KEY, sku VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, price INT NOT NULL, old_price INT NOT NULL, discount VARCHAR(40) NOT NULL DEFAULT '', rating DECIMAL(3,1) NOT NULL DEFAULT 0, reviews_count INT NOT NULL DEFAULT 0, image LONGTEXT NOT NULL, image_2 LONGTEXT NULL, image_3 LONGTEXT NULL, image_4 LONGTEXT NULL, category VARCHAR(100) NOT NULL, color VARCHAR(100) NOT NULL DEFAULT '', blades VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(80) NOT NULL DEFAULT '', description TEXT NOT NULL, stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+  try { await db.query("ALTER TABLE products ADD COLUMN stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock'"); } catch {}
+  try { await db.query("ALTER TABLE products MODIFY COLUMN image LONGTEXT NOT NULL"); } catch {}
+  for (const column of ['image_2', 'image_3', 'image_4']) {
+    try { await db.query(`ALTER TABLE products ADD COLUMN ${column} LONGTEXT NULL`); } catch {}
+    try { await db.query(`ALTER TABLE products MODIFY COLUMN ${column} LONGTEXT NULL`); } catch {}
+  }
+  await db.query(`CREATE TABLE IF NOT EXISTS product_reviews (id INT AUTO_INCREMENT PRIMARY KEY, product_id VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, review_date VARCHAR(80) NOT NULL, rating INT NOT NULL, review_text TEXT NOT NULL, seed_key VARCHAR(180) UNIQUE NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(product_id))`);
+  for (const product of seedProducts) await db.query(`INSERT IGNORE INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [product.id, product.sku, product.name, product.price, product.oldPrice, product.discount, product.rating, product.reviews, product.image, product.image2 || null, product.image3 || null, product.image4 || null, product.category, product.color, product.blades, product.size, product.description, product.stockStatus || 'in_stock']);
+  for (const [productId, reviews] of Object.entries(reviewsByProduct)) for (const [index, review] of reviews.entries()) await db.query(`INSERT IGNORE INTO product_reviews (product_id, name, review_date, rating, review_text, seed_key) VALUES (?, ?, ?, ?, ?, ?)`, [productId, review.name, review.date, review.rating, review.text, `${productId}-seed-${index}`]);
+}
+
+export function mapProduct(row) { return { ...row, oldPrice: Number(row.old_price), reviews: Number(row.reviews_count), price: Number(row.price), rating: Number(row.rating), stockStatus: row.stock_status || 'in_stock', image2: row.image_2 || '', image3: row.image_3 || '', image4: row.image_4 || '', old_price: undefined, reviews_count: undefined }; }
+export function mapReview(row) { return { id: Number(row.id), productId: row.product_id, name: row.name, date: row.review_date, rating: Number(row.rating), text: row.review_text }; }
+export async function listProducts() { const [rows] = await getPool().query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products ORDER BY created_at ASC, id ASC'); return rows.map(mapProduct); }
+export async function saveProduct(input, id = input.id) { const values = [id, input.sku, input.name, Number(input.price), Number(input.oldPrice || input.price), input.discount || '', Number(input.rating || 0), Number(input.reviews || 0), input.image, input.image2 || null, input.image3 || null, input.image4 || null, input.category, input.color || '', input.blades || '', input.size || '', input.description || '', input.stockStatus || 'in_stock']; await getPool().query(`INSERT INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE sku=VALUES(sku), name=VALUES(name), price=VALUES(price), old_price=VALUES(old_price), discount=VALUES(discount), rating=VALUES(rating), reviews_count=VALUES(reviews_count), image=VALUES(image), image_2=VALUES(image_2), image_3=VALUES(image_3), image_4=VALUES(image_4), category=VALUES(category), color=VALUES(color), blades=VALUES(blades), size=VALUES(size), description=VALUES(description), stock_status=VALUES(stock_status)`, values); const [rows] = await getPool().query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products WHERE id = ?', [id]); return mapProduct(rows[0]); }
+export async function removeProduct(id) { await getPool().query('DELETE FROM products WHERE id = ?', [id]); }
+export async function listReviews(productId) { const [rows] = await getPool().query(productId ? 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE product_id = ? ORDER BY created_at DESC, id DESC' : 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews ORDER BY created_at DESC, id DESC', productId ? [productId] : []); return rows.map(mapReview); }
+export async function saveReview(input, id = input.id) { if (id) { await getPool().query('UPDATE product_reviews SET product_id=?, name=?, review_date=?, rating=?, review_text=? WHERE id=?', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text, id]); } else { const [result] = await getPool().query('INSERT INTO product_reviews (product_id, name, review_date, rating, review_text) VALUES (?, ?, ?, ?, ?)', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text]); id = result.insertId; } const [rows] = await getPool().query('SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE id=?', [id]); return mapReview(rows[0]); }
+export async function removeReview(id) { await getPool().query('DELETE FROM product_reviews WHERE id=?', [id]); }

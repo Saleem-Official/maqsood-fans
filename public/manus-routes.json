@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"Maqsood Fans — Home"},{"path":"/products","title":"Ceiling Fans"},{"path":"/products/:id","title":"Fan Details"},{"path":"/cart","title":"Your Cart"},{"path":"/checkout","title":"Checkout"},{"path":"/admin","title":"Maqsood Fans Admin"}]}
