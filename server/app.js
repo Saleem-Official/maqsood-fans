@@ -1,11 +1,32 @@
 import express from 'express';
-import { listProducts, listReviews, removeProduct, removeReview, saveProduct, saveReview } from './db.js';
+import { getAdminPassword, listProducts, listReviews, removeProduct, removeReview, saveProduct, saveReview, setAdminPassword } from './db.js';
 
 export function createApp() {
   const app = express();
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
   app.get('/api/health', (req, res) => res.json({ ok: true }));
+  app.post('/api/admin/verify-password', async (req, res, next) => {
+    try {
+      const current = await getAdminPassword();
+      const valid = Boolean(req.body && req.body.password && req.body.password === current);
+      res.json({ valid });
+    } catch (error) { next(error); }
+  });
+  app.post('/api/admin/change-password', async (req, res, next) => {
+    try {
+      const current = await getAdminPassword();
+      if (!req.body || req.body.currentPassword !== current) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+      const newPass = String(req.body.newPassword || '').trim();
+      if (newPass.length < 3) {
+        return res.status(400).json({ error: 'New password must be at least 3 characters' });
+      }
+      await setAdminPassword(newPass);
+      res.json({ success: true });
+    } catch (error) { next(error); }
+  });
   app.get('/api/products', async (req, res, next) => { try { res.json(await listProducts()); } catch (error) { next(error); } });
   app.get('/api/reviews', async (req, res, next) => { try { res.json(await listReviews(req.query.productId)); } catch (error) { next(error); } });
   app.get('/api/admin/products', async (req, res, next) => { try { res.json(await listProducts()); } catch (error) { next(error); } });

@@ -12,6 +12,7 @@ const rootDir = path.resolve(__dirname, '..');
 let products = JSON.parse(JSON.stringify(initialProducts));
 let reviews = [];
 let nextReviewId = 100;
+let adminPassword = 'maqsood123';
 
 for (const [productId, revList] of Object.entries(initialReviewsByProduct)) {
   for (const r of revList) {
@@ -73,6 +74,25 @@ const server = http.createServer(async (req, res) => {
   // API endpoints
   if (pathname === '/api/health') {
     return sendJson(res, 200, { ok: true, mode: 'preview-server' });
+  }
+
+  if (pathname === '/api/admin/verify-password' && req.method === 'POST') {
+    const data = await readBody(req);
+    const valid = Boolean(data && data.password && data.password === adminPassword);
+    return sendJson(res, 200, { valid });
+  }
+
+  if (pathname === '/api/admin/change-password' && req.method === 'POST') {
+    const data = await readBody(req);
+    if (!data || data.currentPassword !== adminPassword) {
+      return sendJson(res, 401, { error: 'Current password is incorrect' });
+    }
+    const newPass = String(data.newPassword || '').trim();
+    if (newPass.length < 3) {
+      return sendJson(res, 400, { error: 'New password must be at least 3 characters' });
+    }
+    adminPassword = newPass;
+    return sendJson(res, 200, { success: true });
   }
 
   if (pathname === '/api/products' || pathname === '/api/admin/products') {

@@ -49,3 +49,21 @@
 .admin-img-thumb img{width:100%;height:100%;object-fit:cover}
 .admin-img-thumb span{font-size:8px;color:#9b958c;text-align:center;line-height:1}
 
+/* Admin Password Lock Screen & Modal */
+.admin-lock-screen{display:flex;align-items:center;justify-content:center;padding:50px 20px;min-height:55vh}
+.admin-lock-card{background:#fff;border:1px solid var(--line);padding:36px;border-radius:4px;max-width:420px;width:100%;box-shadow:var(--shadow);text-align:center}
+.admin-lock-card h2{font-size:24px;letter-spacing:-.04em;margin:10px 0 8px}
+.admin-lock-card p{font-size:12px;color:var(--muted);margin:0 0 24px;line-height:1.6}
+.admin-lock-card .admin-field{text-align:left;margin-bottom:16px}
+.admin-lock-card .admin-field input{width:100%;font-size:14px;padding:12px 14px}
+.admin-pass-error{color:#b52d2d;font-size:11px;font-weight:600;margin-top:10px;text-align:center;min-height:16px}
+.admin-topbar-right{display:flex;align-items:center;gap:10px}
+.admin-action-pill{font-size:11px;font-weight:600;padding:6px 12px;background:#f3ede2;border:1px solid #dfd4bf;border-radius:2px;color:var(--gold-dark);cursor:pointer;transition:.2s}
+.admin-action-pill:hover{background:#eadfc9}
+.admin-modal-backdrop{position:fixed;inset:0;background:rgba(20,19,16,.65);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.admin-modal-card{background:#fff;border:1px solid var(--line);padding:30px;border-radius:4px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.admin-modal-card h3{font-size:22px;letter-spacing:-.03em;margin:8px 0 6px}
+.admin-modal-card p{font-size:12px;color:var(--muted);margin:0 0 20px}
+.admin-modal-card .admin-field{margin-bottom:14px}
+
+

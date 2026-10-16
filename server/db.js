@@ -19,8 +19,25 @@ export async function initDb() {
     try { await db.query(`ALTER TABLE products MODIFY COLUMN ${column} LONGTEXT NULL`); } catch {}
   }
   await db.query(`CREATE TABLE IF NOT EXISTS product_reviews (id INT AUTO_INCREMENT PRIMARY KEY, product_id VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, review_date VARCHAR(80) NOT NULL, rating INT NOT NULL, review_text TEXT NOT NULL, seed_key VARCHAR(180) UNIQUE NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(product_id))`);
+  await db.query(`CREATE TABLE IF NOT EXISTS site_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+  await db.query(`INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES ('admin_password', 'maqsood123')`);
   for (const product of seedProducts) await db.query(`INSERT IGNORE INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [product.id, product.sku, product.name, product.price, product.oldPrice, product.discount, product.rating, product.reviews, product.image, product.image2 || null, product.image3 || null, product.image4 || null, product.category, product.color, product.blades, product.size, product.description, product.stockStatus || 'in_stock']);
   for (const [productId, reviews] of Object.entries(reviewsByProduct)) for (const [index, review] of reviews.entries()) await db.query(`INSERT IGNORE INTO product_reviews (product_id, name, review_date, rating, review_text, seed_key) VALUES (?, ?, ?, ?, ?, ?)`, [productId, review.name, review.date, review.rating, review.text, `${productId}-seed-${index}`]);
+}
+
+export async function getAdminPassword() {
+  if (!process.env.DATABASE_URL) return 'maqsood123';
+  try {
+    const [rows] = await getPool().query("SELECT setting_value FROM site_settings WHERE setting_key = 'admin_password'");
+    return rows.length ? rows[0].setting_value : 'maqsood123';
+  } catch {
+    return 'maqsood123';
+  }
+}
+
+export async function setAdminPassword(newPassword) {
+  if (!process.env.DATABASE_URL) return;
+  await getPool().query("INSERT INTO site_settings (setting_key, setting_value) VALUES ('admin_password', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)", [newPassword]);
 }
 
 export function mapProduct(row) { return { ...row, oldPrice: Number(row.old_price), reviews: Number(row.reviews_count), price: Number(row.price), rating: Number(row.rating), stockStatus: row.stock_status || 'in_stock', image2: row.image_2 || '', image3: row.image_3 || '', image4: row.image_4 || '', old_price: undefined, reviews_count: undefined }; }

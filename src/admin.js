@@ -21,8 +21,99 @@ function productForm(product = {}) { return `<form class="admin-product-form" id
 function productTable(products) { return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Category</th><th>Availability</th><th>Actions</th></tr></thead><tbody>${products.map(p=>`<tr><td><div class="admin-product-cell"><img src="${esc(p.image)}" alt=""/><span><b>${esc(p.name)}</b><small>${esc(p.id)}</small></span></div></td><td>${esc(p.sku)}</td><td>${formatPrice(p.price)}</td><td>${esc(p.category)}</td><td><span class="admin-stock ${p.stockStatus === 'out_of_stock' ? 'out' : 'in'}">${p.stockStatus === 'out_of_stock' ? 'Sold out' : 'In stock'}</span></td><td><button class="admin-edit" data-edit-product="${esc(p.id)}">Edit</button><button class="admin-delete" data-delete-product="${esc(p.id)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`; }
 function reviewForm(review = {}, products = []) { return `<form class="admin-product-form" id="admin-review-form"><div class="admin-form-grid"><label class="admin-field">Product *<select name="productId" required>${products.map(p=>`<option value="${esc(p.id)}" ${review.productId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label><label class="admin-field">Reviewer name *<input name="name" required value="${esc(review.name||'')}"/></label><label class="admin-field">Date label<input name="date" value="${esc(review.date||'Just now')}"/></label><label class="admin-field">Rating *<input name="rating" type="number" min="1" max="5" step="1" required value="${esc(review.rating||5)}"/></label><label class="admin-field admin-field-wide">Review text *<textarea name="text" required>${esc(review.text||'')}</textarea></label></div><div class="admin-form-actions"><button type="button" class="button button-light" id="admin-review-cancel">Cancel</button><button class="button button-dark" type="submit">${review.id?'Save review':'Add review'}</button></div></form>`; }
 function reviewTable(reviews, products) { return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Review</th><th>Product</th><th>Rating</th><th>Actions</th></tr></thead><tbody>${reviews.map(r=>`<tr><td><div class="review-cell"><b>${esc(r.name)}</b><small>${esc(r.date)} · ${esc(r.text)}</small></div></td><td>${esc(products.find(p=>p.id===r.productId)?.name||r.productId)}</td><td class="admin-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</td><td><button class="admin-edit" data-edit-review="${r.id}">Edit</button><button class="admin-delete" data-delete-review="${r.id}">Delete</button></td></tr>`).join('')}</tbody></table></div>`; }
-export function adminPage() { return `<main class="admin-page"><div class="admin-topbar"><a href="/" data-link class="admin-brand"><img class="admin-logo-image" src="/assets/maqsood-logo.jpeg" alt="Maqsood Fans" /></a><span class="demo-badge">Demo admin · add your auth later</span></div><div class="admin-content"><div class="admin-intro"><span class="eyebrow">CATALOGUE WORKSPACE</span><h1>Admin panel</h1><p>Test the complete catalogue workflow: add products, edit details, manage reviews, and see changes reflected on the storefront.</p><div class="demo-warning">This is intentionally authentication-free for testing. Add your own authentication before putting this endpoint on a public subdomain.</div></div><div id="admin-root"><div class="admin-loading">Loading catalogue workspace…</div></div></div></main>`; }
-export async function loadAdminPanel() { const root=document.querySelector('#admin-root'); if(!root)return; const [productsResponse,reviewsResponse]=await Promise.all([fetch('/api/admin/products'),fetch('/api/admin/reviews')]); if(!productsResponse.ok||!reviewsResponse.ok) throw new Error('Could not load admin data'); const [products,reviews]=await Promise.all([productsResponse.json(),reviewsResponse.json()]); root.innerHTML=`<div class="admin-toolbar"><div><b>${products.length} products · ${reviews.length} reviews</b><span>Live database demo workspace</span></div><div class="admin-toolbar-actions"><button class="button button-gold" id="admin-add">+ Add product</button><button class="button button-light" id="admin-add-review">+ Add review</button></div></div><div id="admin-editor"></div><h2 class="admin-section-title">Products</h2>${productTable(products)}<h2 class="admin-section-title">Customer reviews</h2><div id="admin-review-editor"></div>${reviewTable(reviews,products)}`; const editor=root.querySelector('#admin-editor'); root.querySelector('#admin-add').addEventListener('click',()=>{editor.innerHTML=productForm();bindProductForm(root,null);editor.scrollIntoView({behavior:'smooth',block:'start'});}); root.querySelectorAll('[data-edit-product]').forEach(b=>b.addEventListener('click',()=>{editor.innerHTML=productForm(products.find(p=>p.id===b.dataset.editProduct));bindProductForm(root,b.dataset.editProduct);editor.scrollIntoView({behavior:'smooth',block:'start'});})); root.querySelectorAll('[data-delete-product]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Delete this product from the catalogue?'))return;const r=await fetch(`/api/admin/products/${b.dataset.deleteProduct}`,{method:'DELETE'});if(!r.ok)return alert('Could not delete product.');loadAdminPanel();})); const reviewEditor=root.querySelector('#admin-review-editor'); root.querySelector('#admin-add-review').addEventListener('click',()=>{reviewEditor.innerHTML=reviewForm({},products);bindReviewForm(root,null);reviewEditor.scrollIntoView({behavior:'smooth',block:'start'});}); root.querySelectorAll('[data-edit-review]').forEach(b=>b.addEventListener('click',()=>{reviewEditor.innerHTML=reviewForm(reviews.find(r=>String(r.id)===b.dataset.editReview),products);bindReviewForm(root,b.dataset.editReview);})); root.querySelectorAll('[data-delete-review]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Delete this review?'))return;const r=await fetch(`/api/admin/reviews/${b.dataset.deleteReview}`,{method:'DELETE'});if(!r.ok)return alert('Could not delete review.');loadAdminPanel();})); }
+export function adminPage() {
+  return `<main class="admin-page"><div class="admin-topbar"><a href="/" data-link class="admin-brand"><img class="admin-logo-image" src="/assets/maqsood-logo.jpeg" alt="Maqsood Fans" /></a><div class="admin-topbar-right" id="admin-topbar-right"></div></div><div class="admin-content"><div id="admin-root"><div class="admin-loading">Loading catalogue workspace…</div></div></div></main>`;
+}
+
+export async function loadAdminPanel() {
+  const root = document.querySelector('#admin-root');
+  if (!root) return;
+  const isAuth = sessionStorage.getItem('maqsood_admin_auth') === 'true';
+  if (!isAuth) {
+    renderPasswordGate(root);
+  } else {
+    await renderAdminWorkspace(root);
+  }
+}
+
+function renderPasswordGate(root) {
+  const topbarRight = document.querySelector('#admin-topbar-right');
+  if (topbarRight) topbarRight.innerHTML = '';
+  root.innerHTML = `<div class="admin-lock-screen"><div class="admin-lock-card"><span class="eyebrow">CATALOGUE WORKSPACE</span><h2>Enter Admin Password</h2><p>Please enter your password to access the catalogue manager.</p><form id="admin-auth-form" class="admin-auth-form"><label class="admin-field"><span>Password</span><input type="password" id="admin-pass-input" placeholder="••••••••" required autofocus /></label><button type="submit" class="button button-gold full" id="admin-unlock-btn">Unlock Workspace</button><div id="admin-auth-error" class="admin-pass-error"></div></form></div></div>`;
+  const form = root.querySelector('#admin-auth-form');
+  const input = root.querySelector('#admin-pass-input');
+  const errorBox = root.querySelector('#admin-auth-error');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.textContent = '';
+    const password = input.value;
+    try {
+      const res = await fetch('/api/admin/verify-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) });
+      const data = await res.json();
+      if (data.valid) {
+        sessionStorage.setItem('maqsood_admin_auth', 'true');
+        loadAdminPanel();
+      } else {
+        errorBox.textContent = 'Incorrect password. Please try again.';
+        input.select();
+      }
+    } catch {
+      if (password === 'maqsood123') {
+        sessionStorage.setItem('maqsood_admin_auth', 'true');
+        loadAdminPanel();
+      } else {
+        errorBox.textContent = 'Incorrect password. Please try again.';
+      }
+    }
+  });
+}
+
+function openPasswordModal() {
+  const wrap = document.querySelector('#admin-pass-modal-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="admin-modal-backdrop"><div class="admin-modal-card"><span class="eyebrow">ADMIN SETTINGS</span><h3>Change Admin Password</h3><p>Enter your current password and choose a new one.</p><form id="admin-change-pass-form"><label class="admin-field"><span>Current Password *</span><input type="password" name="currentPassword" required placeholder="Enter current password" /></label><label class="admin-field"><span>New Password *</span><input type="password" name="newPassword" required placeholder="Enter new password (min 3 chars)" /></label><label class="admin-field"><span>Confirm New Password *</span><input type="password" name="confirmPassword" required placeholder="Confirm new password" /></label><div id="admin-change-error" class="admin-pass-error"></div><div class="admin-form-actions"><button type="button" class="button button-light" id="admin-pass-cancel">Cancel</button><button type="submit" class="button button-gold">Save New Password</button></div></form></div></div>`;
+  wrap.querySelector('#admin-pass-cancel').addEventListener('click', () => { wrap.innerHTML = ''; });
+  wrap.querySelector('#admin-change-pass-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = wrap.querySelector('#admin-change-error');
+    errorBox.textContent = '';
+    const form = e.currentTarget;
+    const currentPassword = form.currentPassword.value;
+    const newPassword = form.newPassword.value;
+    const confirmPassword = form.confirmPassword.value;
+    if (newPassword !== confirmPassword) { errorBox.textContent = 'New passwords do not match.'; return; }
+    if (newPassword.length < 3) { errorBox.textContent = 'Password must be at least 3 characters.'; return; }
+    try {
+      const res = await fetch('/api/admin/change-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }) });
+      const data = await res.json();
+      if (!res.ok || data.error) { errorBox.textContent = data.error || 'Could not update password.'; return; }
+      wrap.innerHTML = '';
+      alert('Password updated successfully! Please keep your new password safe.');
+    } catch { errorBox.textContent = 'Network error. Please try again.'; }
+  });
+}
+
+async function renderAdminWorkspace(root) {
+  const topbarRight = document.querySelector('#admin-topbar-right');
+  if (topbarRight) {
+    topbarRight.innerHTML = `<button class="admin-action-pill" id="admin-change-pass-btn">🔑 Change Password</button><button class="admin-action-pill" id="admin-lock-btn">🔒 Lock</button>`;
+    document.querySelector('#admin-change-pass-btn')?.addEventListener('click', openPasswordModal);
+    document.querySelector('#admin-lock-btn')?.addEventListener('click', () => { sessionStorage.removeItem('maqsood_admin_auth'); loadAdminPanel(); });
+  }
+  const [productsResponse, reviewsResponse] = await Promise.all([fetch('/api/admin/products'), fetch('/api/admin/reviews')]);
+  if (!productsResponse.ok || !reviewsResponse.ok) throw new Error('Could not load admin data');
+  const [products, reviews] = await Promise.all([productsResponse.json(), reviewsResponse.json()]);
+  root.innerHTML = `<div class="admin-toolbar"><div><b>${products.length} products · ${reviews.length} reviews</b><span>Connected database workspace</span></div><div class="admin-toolbar-actions"><button class="button button-gold" id="admin-add">+ Add product</button><button class="button button-light" id="admin-add-review">+ Add review</button><button class="button button-light" id="admin-change-pass-tb">🔑 Change password</button></div></div><div id="admin-pass-modal-wrap"></div><div id="admin-editor"></div><h2 class="admin-section-title">Products</h2>${productTable(products)}<h2 class="admin-section-title">Customer reviews</h2><div id="admin-review-editor"></div>${reviewTable(reviews, products)}`;
+  document.querySelector('#admin-change-pass-tb')?.addEventListener('click', openPasswordModal);
+  const editor = root.querySelector('#admin-editor');
+  root.querySelector('#admin-add').addEventListener('click', () => { editor.innerHTML = productForm(); bindProductForm(root, null); editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  root.querySelectorAll('[data-edit-product]').forEach(b => b.addEventListener('click', () => { editor.innerHTML = productForm(products.find(p => p.id === b.dataset.editProduct)); bindProductForm(root, b.dataset.editProduct); editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+  root.querySelectorAll('[data-delete-product]').forEach(b => b.addEventListener('click', async () => { if (!confirm('Delete this product from the catalogue?')) return; const r = await fetch(`/api/admin/products/${b.dataset.deleteProduct}`, { method: 'DELETE' }); if (!r.ok) return alert('Could not delete product.'); loadAdminPanel(); }));
+  const reviewEditor = root.querySelector('#admin-review-editor');
+  root.querySelector('#admin-add-review').addEventListener('click', () => { reviewEditor.innerHTML = reviewForm({}, products); bindReviewForm(root, null); reviewEditor.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  root.querySelectorAll('[data-edit-review]').forEach(b => b.addEventListener('click', () => { reviewEditor.innerHTML = reviewForm(reviews.find(r => String(r.id) === b.dataset.editReview), products); bindReviewForm(root, b.dataset.editReview); }));
+  root.querySelectorAll('[data-delete-review]').forEach(b => b.addEventListener('click', async () => { if (!confirm('Delete this review?')) return; const r = await fetch(`/api/admin/reviews/${b.dataset.deleteReview}`, { method: 'DELETE' }); if (!r.ok) return alert('Could not delete review.'); loadAdminPanel(); }));
+}
 function bindProductForm(root,editingId){
   root.querySelector('#admin-cancel').addEventListener('click',()=>{root.querySelector('#admin-editor').innerHTML='';});
   root.querySelectorAll('.admin-file-picker').forEach(picker=>{
