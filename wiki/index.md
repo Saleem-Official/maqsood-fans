@@ -51,6 +51,7 @@ Vercel edge hosting, custom subdomain aliases, WhatsApp checkout, and security h
 
 | Article | Summary | Updated |
 |---|---|---|
-| [Vercel Cloud and Subdomains](deployment/vercel-cloud-and-subdomains.md) | Vercel serverless deployment, URL rewrites, and dedicated admin subdomain mapping. | 2026-10-16 |
+| [Vercel Cloud and Subdomains](deployment/vercel-cloud-and-subdomains.md) | Vercel serverless deployment, URL rewrites, and dedicated admin subdomain mapping. | 2026-10-17 |
+| [SEO, Indexing, and Local Ranking](deployment/seo-indexing-and-local-ranking.md) | Technical SEO, robots.txt, sitemap.xml, LocalBusiness schema, GSC verification, and Lahore local pack ranking. | 2026-10-17 |
 | [WhatsApp Checkout Integration](deployment/whatsapp-checkout-integration.md) | Direct WhatsApp click-to-chat ordering flow and Lahore same-day delivery rules. | 2026-10-16 |
 | [Production Hardening and Security](deployment/production-hardening-and-security.md) | Security checklist, rate limiting, container deployment, and verification probes. | 2026-10-16 |

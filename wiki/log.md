@@ -59,4 +59,9 @@
 - Pages: wiki/deployment/vercel-cloud-and-subdomains.md
 - Configuration: Apex maqsoodfans.com, www.maqsoodfans.com, and admin.maqsoodfans.com mapped to Vercel production deployment with automated DNS and SSL certificates.
 
-## [2026-10-16] lint | 0 issues found, 0 auto-fixed
+## [2026-10-17] ingest | SEO, Indexing, and Local Ranking
+- Disposition: New
+- Pages: wiki/deployment/seo-indexing-and-local-ranking.md
+- Configuration: Robots.txt crawl rules, sitemap.xml with 11 URLs, HomeGoodsStore / LocalBusiness JSON-LD schema, OpenGraph/Twitter social cards, and Lahore local pack ranking strategy.
+
+## [2026-10-17] lint | 0 issues found, 0 auto-fixed
