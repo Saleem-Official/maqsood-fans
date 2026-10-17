@@ -164,8 +164,32 @@ function route() {
   return homePage();
 }
 
+function updateMetaTags() {
+  const path = window.location.pathname;
+  if (isAdminRoute()) {
+    document.title = 'Catalogue Admin Workspace | Maqsood Fans';
+    return;
+  }
+  if (path === '/products') {
+    document.title = 'All Ceiling Fans Collection | Maqsood Fans Lahore';
+  } else if (path.startsWith('/products/')) {
+    const pId = path.split('/')[2];
+    const product = findProduct(pId);
+    if (product) {
+      document.title = `${product.name} (${product.size}) Ceiling Fan | Maqsood Fans Lahore`;
+    }
+  } else if (path === '/cart') {
+    document.title = 'Your Shopping Cart | Maqsood Fans Lahore';
+  } else if (path === '/checkout') {
+    document.title = 'Confirm Your Order on WhatsApp | Maqsood Fans Lahore';
+  } else {
+    document.title = 'Maqsood Fans — Premium Ceiling Fans in Lahore, Pakistan | Buy Online';
+  }
+}
+
 function render() {
   app.innerHTML = route();
+  updateMetaTags();
   bindEvents();
   if (isAdminRoute()) loadAdminPanel().catch(() => { document.querySelector('#admin-root').innerHTML = '<div class="admin-auth-card"><h2>Admin service unavailable</h2><p>Please try again after the server is ready.</p></div>'; });
   if (window.location.hash) {

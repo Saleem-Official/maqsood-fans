@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/admin/
+Disallow: /checkout
+
+# Sitemap index
+Sitemap: https://maqsoodfans.com/sitemap.xml
