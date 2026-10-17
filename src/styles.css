@@ -66,4 +66,36 @@
 .admin-modal-card p{font-size:12px;color:var(--muted);margin:0 0 20px}
 .admin-modal-card .admin-field{margin-bottom:14px}
 
+/* SEO Content: Buying Guide & FAQ Sections */
+.guide-section{background:var(--sand);border-top:1px solid var(--line)}
+.guide-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.guide-card{background:#fff;border:1px solid var(--line);padding:28px 24px;border-radius:4px;transition:transform .2s,box-shadow .2s}
+.guide-card:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+.guide-card.featured{border-color:var(--gold);box-shadow:0 8px 30px rgba(183,134,38,.12)}
+.guide-chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;padding:4px 8px;border-radius:2px;background:#ede8df;color:var(--ink);margin-bottom:14px}
+.guide-chip.gold{background:#fdf4e2;color:var(--gold-dark);border:1px solid #ebd4a5}
+.guide-card h3{font-size:18px;margin:0 0 10px;letter-spacing:-.03em}
+.guide-card p{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 16px}
+.guide-metric{display:block;font-size:11px;font-weight:700;color:var(--gold-dark);border-top:1px solid var(--sand-deep);padding-top:12px}
+
+.faq-section{background:#fff;border-top:1px solid var(--line)}
+.faq-list{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.faq-item{border:1px solid var(--line);border-radius:4px;background:#faf9f6;overflow:hidden;transition:background .2s,border-color .2s}
+.faq-item[open]{background:#fff;border-color:var(--gold)}
+.faq-question{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink);user-select:none;list-style:none}
+.faq-question::-webkit-details-marker{display:none}
+.faq-arrow{color:var(--gold);transition:transform .2s;flex-shrink:0}
+.faq-item[open] .faq-arrow{transform:rotate(180deg)}
+.faq-answer{padding:0 22px 20px;font-size:13px;line-height:1.7;color:var(--muted);border-top:1px solid #f2ede4}
+.faq-answer p{margin:12px 0 0}
+
+@media(max-width:900px){
+  .guide-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .faq-question{font-size:13px;padding:14px 16px}
+  .faq-answer{padding:0 16px 16px;font-size:12px}
+}
+
+
 
