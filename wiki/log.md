@@ -54,4 +54,9 @@
 - Raw: raw/architecture/2026-10-16-system-architecture-and-stack.md
 - Raw: raw/deployment/2026-10-16-vercel-hosting-and-subdomain-configuration.md
 
+## [2026-10-17] update | Custom Domain and Admin Subdomain (maqsoodfans.com)
+- Disposition: Update
+- Pages: wiki/deployment/vercel-cloud-and-subdomains.md
+- Configuration: Apex maqsoodfans.com, www.maqsoodfans.com, and admin.maqsoodfans.com mapped to Vercel production deployment with automated DNS and SSL certificates.
+
 ## [2026-10-16] lint | 0 issues found, 0 auto-fixed
