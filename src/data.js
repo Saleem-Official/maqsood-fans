@@ -1,39 +1,39 @@
 export const products = [
   {
     id: 'royal-plus', name: 'Royal Plus', sku: 'MF-1001', price: 8400, oldPrice: 12000, discount: '30% OFF', rating: 4.9, reviews: 24,
-    image: '/assets/royal-plus.jpg', category: 'Premium', color: 'Ivory', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A graceful ivory finish with a quiet, high-performance motor made for relaxed living rooms.'
+    image: '/assets/royal-plus.jpg', category: 'Premium', color: 'Ivory', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'The Royal Plus by Maqsood Fans features a graceful ivory finish with an energy-efficient pure copper motor made for modern Pakistani living rooms. Delivers quiet, powerful airflow, low wattage consumption, and reliable everyday cooling.'
   },
   {
     id: 'classic-pro', name: 'Classic Pro', sku: 'MF-1002', price: 8800, oldPrice: 11000, discount: '20% OFF', rating: 4.8, reviews: 18,
-    image: '/assets/classic-detail.jpg', category: 'Premium', color: 'Black / Gold', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bold black-and-gold statement piece with powerful airflow and an elegant modern profile.'
+    image: '/assets/classic-detail.jpg', category: 'Premium', color: 'Black / Gold', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bold black-and-gold designer ceiling fan by Maqsood Fans with high air delivery and modern aesthetic appeal. Features a heavy-duty copper motor, smooth 3-blade balance, and dependable operation for lounges and living rooms.'
   },
   {
     id: 'elite-series', name: 'Elite Series', sku: 'MF-1003', price: 10500, oldPrice: 14000, discount: '25% OFF', rating: 4.9, reviews: 32,
-    image: '/assets/elite-series.jpg', category: 'Designer', color: 'Pearl White', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'Clean, contemporary and energy efficient — the everyday luxury pick for bright spaces.'
+    image: '/assets/elite-series.jpg', category: 'Designer', color: 'Pearl White', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A 52-inch designer ceiling fan engineered for maximum energy efficiency and whisper-quiet circulation. Consumes up to 50% less power, making it an ideal modern pick for bedrooms and drawing rooms in Pakistan.'
   },
   {
     id: 'wooden-touch', name: 'Wooden Touch', sku: 'MF-1004', price: 10400, oldPrice: 13000, discount: '20% OFF', rating: 4.7, reviews: 17,
-    image: '/assets/wooden-touch.jpg', category: 'Natural', color: 'Walnut', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'Warm wood tones and smooth air movement bring a softer, more natural rhythm home.'
+    image: '/assets/wooden-touch.jpg', category: 'Natural', color: 'Walnut', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'Rich walnut wood tones paired with a high-performance copper motor. Delivers smooth, natural airflow and warm acoustic comfort for luxury bedrooms and study rooms across Pakistan.'
   },
   {
     id: 'modern-gold', name: 'Modern Gold', sku: 'MF-1005', price: 11900, oldPrice: 14900, discount: '20% OFF', rating: 4.8, reviews: 12,
-    image: '/assets/modern-gold.jpg', category: 'Designer', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A sculptural gold accent for interiors that love a little more personality overhead.'
+    image: '/assets/modern-gold.jpg', category: 'Designer', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A sculptural champagne gold ceiling fan by Maqsood Fans with a wide 52-inch blade sweep. Combines eye-catching interior luxury with energy-saving airflow for open-plan Pakistani homes.'
   },
   {
     id: 'sleek-white', name: 'Sleek White', sku: 'MF-1006', price: 9900, oldPrice: 11900, discount: '15% OFF', rating: 4.6, reviews: 9,
-    image: '/assets/sleek-white.jpg', category: 'Everyday', color: 'Snow White', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'Minimal from every angle, with whisper-quiet performance for bedrooms and studies.'
+    image: '/assets/sleek-white.jpg', category: 'Everyday', color: 'Snow White', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A clean, minimal 48-inch electric ceiling fan engineered for whisper-quiet performance. Built with durable electrical silicon steel and pure copper windings for everyday bedroom comfort.'
   },
   {
     id: 'aura-living-52', name: 'Aura Living 52', sku: 'MF-DEMO-201', price: 12800, oldPrice: 15900, discount: '20% OFF', rating: 4.8, reviews: 27,
-    image: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', category: 'Premium', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A refined statement fan for open-plan living rooms, pairing a quiet copper motor with a warm champagne finish and wide, comfortable airflow.'
+    image: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', category: 'Premium', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A premium 52-inch ceiling fan engineered for open-plan living rooms and drawing areas. Pairs a quiet copper motor with a warm champagne finish, low energy consumption, and wide air coverage.'
   },
   {
     id: 'nordic-breeze-48', name: 'Nordic Breeze 48', sku: 'MF-DEMO-202', price: 9600, oldPrice: 11800, discount: '15% OFF', rating: 4.6, reviews: 14,
-    image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', category: 'Designer', color: 'Snow White', blades: '4 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bright, minimal ceiling fan designed for bedrooms and studies, with a soft white profile and smooth low-noise circulation.'
+    image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', category: 'Designer', color: 'Snow White', blades: '4 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bright 4-blade modern ceiling fan designed for bedrooms and home offices. Delivers smooth, low-noise circulation with dependable electric efficiency and clean Scandinavian styling.'
   },
   {
     id: 'heritage-air-56', name: 'Heritage Air 56', sku: 'MF-DEMO-203', price: 14500, oldPrice: 17900, discount: '30% OFF', rating: 4.9, reviews: 39,
-    image: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', category: 'Natural', color: 'Walnut', blades: '5 blade', size: '56 inch', stockStatus: 'out_of_stock', description: 'A broad, architectural fan for larger rooms, built around a warm wood-inspired look and powerful air movement.'
+    image: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', category: 'Natural', color: 'Walnut', blades: '5 blade', size: '56 inch', stockStatus: 'out_of_stock', description: 'An expansive 56-inch architectural ceiling fan by Maqsood Fans built for large halls, drawing rooms, and high ceilings. Features heavy-duty copper winding for maximum air delivery across expansive spaces.'
   }
 ];
 

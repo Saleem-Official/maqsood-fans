@@ -97,5 +97,21 @@
   .faq-answer{padding:0 16px 16px;font-size:12px}
 }
 
+/* SEO Brand Story & Local Service Support */
+.brand-story-card{background:var(--sand);border:1px solid var(--line);padding:32px 28px;border-radius:4px;margin-top:28px}
+.brand-story-card h3{font-size:20px;letter-spacing:-.03em;margin:8px 0 12px;color:var(--ink)}
+.brand-story-card p{font-size:13px;line-height:1.7;color:var(--muted);margin:0 0 20px;max-width:820px}
+.brand-story-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-top:1px solid var(--line);padding-top:20px}
+.brand-story-stats div{display:flex;flex-direction:column;gap:4px}
+.brand-story-stats b{font-size:18px;color:var(--gold-dark);letter-spacing:-.02em}
+.brand-story-stats small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 
+.service-support-card{background:#fff;border:1px solid var(--sand-deep);padding:24px 28px;border-radius:4px;margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.service-support-card h3{font-size:16px;margin:4px 0 8px;color:var(--ink);letter-spacing:-.02em}
+.service-support-card p{font-size:12px;line-height:1.6;color:var(--muted);margin:0;max-width:620px}
+.service-support-card .button{flex-shrink:0}
 
+@media(max-width:768px){
+  .brand-story-stats{grid-template-columns:repeat(2,1fr)}
+  .service-support-card{flex-direction:column;align-items:flex-start}
+}
