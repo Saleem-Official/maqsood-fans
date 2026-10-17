@@ -161,7 +161,7 @@ function openPasswordModal() {
 async function renderAdminWorkspace(root) {
   const topbarRight = document.querySelector('#admin-topbar-right');
   if (topbarRight) {
-    topbarRight.innerHTML = `<button class="admin-action-pill" id="admin-change-pass-btn">🔑 Change Password</button><button class="admin-action-pill" id="admin-lock-btn">🔒 Lock</button>`;
+    topbarRight.innerHTML = `<a href="https://maqsoodfans.com" class="admin-action-pill" target="_blank" rel="noopener">🌐 View Live Store</a><button class="admin-action-pill" id="admin-change-pass-btn">🔑 Change Password</button><button class="admin-action-pill" id="admin-lock-btn">🔒 Lock</button>`;
     document.querySelector('#admin-change-pass-btn')?.addEventListener('click', openPasswordModal);
     document.querySelector('#admin-lock-btn')?.addEventListener('click', () => { sessionStorage.removeItem('maqsood_admin_auth'); loadAdminPanel(); });
   }

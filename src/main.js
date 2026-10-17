@@ -151,7 +151,7 @@ function isAdminRoute() {
   const host = window.location.hostname.toLowerCase();
   const isSubdomainAdmin = host.startsWith('admin.') || host.startsWith('admin-') || host.includes('-admin.') || host.includes('.admin.');
   const path = window.location.pathname;
-  return path === '/admin' || (isSubdomainAdmin && (path === '/' || path === ''));
+  return isSubdomainAdmin || path === '/admin' || path.startsWith('/admin/');
 }
 
 function route() {
