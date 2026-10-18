@@ -40,7 +40,7 @@ The customer-facing storefront is a single-page application (SPA) designed to pr
 - Direct Checkout: Seamless transition to the checkout details form.
 
 ### 5. Checkout Presentation (`/checkout`)
-- Customer Details: Simple form capturing Full Name, WhatsApp Number, City (Lahore), Complete Delivery Address, and optional Order Notes.
+- Customer Details: Simple form capturing Full Name, WhatsApp Number, City (editable dropdown with Lahore and custom entry support), Complete Delivery Address, and optional Order Notes.
 - Order Preview: Compact summary showing selected fan thumbnails, quantities, and order total.
 - Direct Order Redirect: Assembles a formatted order message and launches WhatsApp directly.
 

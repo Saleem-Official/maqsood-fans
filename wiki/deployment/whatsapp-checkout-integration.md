@@ -65,8 +65,8 @@ Please confirm availability and delivery timing.
 
 ## Delivery Policy
 
-- Geographic Scope: Free same-day delivery across Lahore, Pakistan.
-- Checkout Form Validation: City dropdown is explicitly restricted to Lahore.
+- Geographic Scope: Free same-day delivery across Lahore, with nationwide shipping throughout Pakistan.
+- Checkout Form Validation: City field is an editable dropdown (combobox) with Lahore and major Pakistani cities suggested, allowing users to type and save any custom city without validation errors.
 - Customer Care Hours: Monday through Saturday, 10am to 7pm.
 
 ## See Also

@@ -115,3 +115,19 @@
   .brand-story-stats{grid-template-columns:repeat(2,1fr)}
   .service-support-card{flex-direction:column;align-items:flex-start}
 }
+
+/* Editable City Dropdown (Combobox) */
+.city-field-label{display:flex;flex-direction:column}
+.combobox-wrap{position:relative;margin-top:6px;width:100%}
+.combobox-wrap .combobox-input{margin-top:0!important;width:100%;padding-right:34px}
+.combobox-toggle{position:absolute;right:0;top:0;bottom:0;width:34px;display:grid;place-items:center;color:var(--muted);background:none;border:none;cursor:pointer;transition:transform .2s,color .2s;z-index:2}
+.combobox-toggle:hover{color:var(--gold-dark)}
+.combobox-wrap.is-open .combobox-toggle{transform:rotate(180deg);color:var(--gold-dark)}
+.combobox-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:2px;box-shadow:0 12px 32px rgba(40,31,18,.12);z-index:50;list-style:none;margin:0;padding:4px 0}
+.combobox-dropdown[hidden]{display:none}
+.combobox-item{padding:9px 12px;font-size:11px;font-weight:500;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;transition:background .15s,color .15s}
+.combobox-item:hover,.combobox-item.is-highlighted{background:var(--sand);color:var(--gold-dark)}
+.combobox-item.is-selected{background:#fdf7ec;font-weight:700;color:var(--gold-dark)}
+.combobox-item small{font-size:9px;color:var(--green);font-weight:600;background:#edf7f0;padding:2px 6px;border-radius:2px}
+.combobox-item.custom{color:var(--muted);border-top:1px dashed var(--line);font-style:italic}
+.combobox-item.custom strong{color:var(--gold-dark);font-style:normal}

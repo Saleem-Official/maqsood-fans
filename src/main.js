@@ -6,6 +6,59 @@ const app = document.querySelector('#app');
 const productOrder = products.map((product) => product.id);
 
 const CART_STORAGE_KEY = 'maqsood_cart';
+const CITY_STORAGE_KEY = 'maqsood_checkout_city';
+const CUSTOM_CITIES_STORAGE_KEY = 'maqsood_custom_cities';
+
+export const POPULAR_CITIES = [
+  'Lahore',
+  'Karachi',
+  'Islamabad',
+  'Rawalpindi',
+  'Faisalabad',
+  'Multan',
+  'Gujranwala',
+  'Peshawar',
+  'Sialkot',
+  'Quetta',
+  'Sargodha',
+  'Bahawalpur',
+  'Gujrat',
+  'Sheikhupura'
+];
+
+function getSavedCity() {
+  try {
+    return localStorage.getItem(CITY_STORAGE_KEY) || 'Lahore';
+  } catch {
+    return 'Lahore';
+  }
+}
+
+function getCitySuggestions() {
+  let custom = [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_CITIES_STORAGE_KEY);
+    if (raw) custom = JSON.parse(raw);
+  } catch {}
+  const unique = new Set(['Lahore', ...custom, ...POPULAR_CITIES]);
+  return Array.from(unique);
+}
+
+function saveCustomCity(cityName) {
+  try {
+    const trimmed = (cityName || '').trim();
+    if (!trimmed) return;
+    localStorage.setItem(CITY_STORAGE_KEY, trimmed);
+    const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    if (POPULAR_CITIES.some((c) => c.toLowerCase() === normalized.toLowerCase())) return;
+    const raw = localStorage.getItem(CUSTOM_CITIES_STORAGE_KEY);
+    let list = raw ? JSON.parse(raw) : [];
+    if (!list.some((c) => c.toLowerCase() === normalized.toLowerCase())) {
+      list.unshift(normalized);
+      localStorage.setItem(CUSTOM_CITIES_STORAGE_KEY, JSON.stringify(list.slice(0, 20)));
+    }
+  } catch {}
+}
 
 function loadSavedCart() {
   try {
@@ -143,7 +196,9 @@ function cartPage() {
 function checkoutPage() {
   const total = state.cart.reduce((sum, item) => sum + item.product.price * item.qty, 0);
   const items = state.cart.length ? state.cart : [{ product: products[1], qty: 1 }];
-  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><a href="/cart" data-link>Cart</a><span>/</span><span>Checkout</span></div><span class="eyebrow">DIRECT ORDERING</span><h1>Almost home.</h1><p>Fill in your details and our team will confirm everything on WhatsApp.</p></div></div><section class="content-section checkout-section"><div class="content-wrap checkout-layout"><form class="checkout-form" id="checkout-form"><div class="form-card"><span class="eyebrow">CUSTOMER INFORMATION</span><h2>Where should we reach you?</h2><div class="form-grid"><label>Full Name *<input name="fullName" required placeholder="Enter your full name" /></label><label>WhatsApp Number *<input name="phone" required placeholder="03XX XXXXXXX" /></label><label>City *<select name="city" required><option value="">Select city</option><option>Lahore</option></select></label><label class="full-field">Complete Delivery Address *<textarea name="address" required placeholder="House no, street, area"></textarea></label><label class="full-field">Order Notes <textarea name="notes" placeholder="Any special instructions (optional)"></textarea></label></div></div><button class="button button-dark full submit-demo" type="submit">${icon('whatsapp', 17)} Place Order on WhatsApp</button><p class="form-note">This is a frontend demo. No account, payment method, or real order will be created.</p></form><aside class="summary-card checkout-summary"><span class="eyebrow">ORDER SUMMARY</span><h2>Your selected fans</h2>${items.map((item) => `<div class="mini-product"><img src="${item.product.image}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} × ${item.qty}</small></div><strong>${formatPrice(item.product.price * item.qty)}</strong></div>`).join('')}<div class="summary-total"><span>Total amount</span><b>${formatPrice(total || items[0].product.price)}</b></div><div class="secure-note">${icon('shield', 17)} <span>Secure by design. Payment is not enabled on this showcase.</span></div></aside></div></section></main>${footer()}`;
+  const currentCity = getSavedCity();
+  const suggestions = getCitySuggestions();
+  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><a href="/cart" data-link>Cart</a><span>/</span><span>Checkout</span></div><span class="eyebrow">DIRECT ORDERING</span><h1>Almost home.</h1><p>Fill in your details and our team will confirm everything on WhatsApp.</p></div></div><section class="content-section checkout-section"><div class="content-wrap checkout-layout"><form class="checkout-form" id="checkout-form"><div class="form-card"><span class="eyebrow">CUSTOMER INFORMATION</span><h2>Where should we reach you?</h2><div class="form-grid"><label>Full Name *<input name="fullName" required placeholder="Enter your full name" /></label><label>WhatsApp Number *<input name="phone" required placeholder="03XX XXXXXXX" /></label><label class="city-field-label">City *<div class="combobox-wrap" id="city-combobox"><input name="city" id="checkout-city" class="combobox-input" required placeholder="Select or type city (e.g. Lahore)" value="${currentCity}" autocomplete="off" aria-autocomplete="list" aria-expanded="false" /><button type="button" class="combobox-toggle" aria-label="Toggle city options" tabindex="-1">${icon('chevron', 14)}</button><ul class="combobox-dropdown" id="city-dropdown" role="listbox" hidden>${suggestions.map((city) => `<li class="combobox-item ${city.toLowerCase() === currentCity.toLowerCase() ? 'is-selected' : ''}" data-value="${city}" role="option"><span>${city}</span>${city.toLowerCase() === 'lahore' ? '<small>Free Same-Day Delivery</small>' : ''}</li>`).join('')}</ul></div></label><label class="full-field">Complete Delivery Address *<textarea name="address" required placeholder="House no, street, area"></textarea></label><label class="full-field">Order Notes <textarea name="notes" placeholder="Any special instructions (optional)"></textarea></label></div></div><button class="button button-dark full submit-demo" type="submit">${icon('whatsapp', 17)} Place Order on WhatsApp</button><p class="form-note">This is a frontend demo. No account, payment method, or real order will be created.</p></form><aside class="summary-card checkout-summary"><span class="eyebrow">ORDER SUMMARY</span><h2>Your selected fans</h2>${items.map((item) => `<div class="mini-product"><img src="${item.product.image}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} × ${item.qty}</small></div><strong>${formatPrice(item.product.price * item.qty)}</strong></div>`).join('')}<div class="summary-total"><span>Total amount</span><b>${formatPrice(total || items[0].product.price)}</b></div><div class="secure-note">${icon('shield', 17)} <span>Secure by design. Payment is not enabled on this showcase.</span></div></aside></div></section></main>${footer()}`;
 }
 
 function mobileBottomNav() {
@@ -330,13 +385,157 @@ function bindEvents() {
     render();
   }));
   document.querySelectorAll('[data-detail-qty]').forEach((button) => button.addEventListener('click', () => { const qty = document.querySelector('#detail-qty'); let value = Number(qty.textContent); value += button.dataset.detailQty === 'plus' ? 1 : -1; qty.textContent = Math.max(1, value); }));
+function bindCityCombobox() {
+  const combobox = document.querySelector('#city-combobox');
+  if (!combobox) return;
+  const input = combobox.querySelector('#checkout-city');
+  const toggle = combobox.querySelector('.combobox-toggle');
+  const dropdown = combobox.querySelector('#city-dropdown');
+  if (!input || !dropdown) return;
+
+  const updateDropdownList = (filterText = '') => {
+    const query = filterText.trim().toLowerCase();
+    const allCities = getCitySuggestions();
+    const matches = query ? allCities.filter((c) => c.toLowerCase().includes(query)) : allCities;
+    let html = '';
+
+    if (query && !allCities.some((c) => c.toLowerCase() === query)) {
+      const customTitle = filterText.trim();
+      html += `<li class="combobox-item custom" data-value="${customTitle}" role="option"><span>Use custom city: <strong>${customTitle}</strong></span></li>`;
+    }
+
+    html += matches.map((city) => `
+      <li class="combobox-item ${city.toLowerCase() === input.value.trim().toLowerCase() ? 'is-selected' : ''}" data-value="${city}" role="option">
+        <span>${city}</span>
+        ${city.toLowerCase() === 'lahore' ? '<small>Free Same-Day Delivery</small>' : ''}
+      </li>
+    `).join('');
+
+    if (!html) {
+      const customTitle = filterText.trim() || 'Custom City';
+      html = `<li class="combobox-item custom" data-value="${customTitle}" role="option"><span>Use custom city: <strong>${customTitle}</strong></span></li>`;
+    }
+
+    dropdown.innerHTML = html;
+    bindDropdownItems();
+  };
+
+  const bindDropdownItems = () => {
+    dropdown.querySelectorAll('.combobox-item').forEach((item) => {
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const val = item.dataset.value;
+        if (val) {
+          input.value = val;
+          saveCustomCity(val);
+        }
+        closeDropdown();
+      });
+    });
+  };
+
+  const openDropdown = () => {
+    updateDropdownList(input.value);
+    dropdown.hidden = false;
+    combobox.classList.add('is-open');
+    input.setAttribute('aria-expanded', 'true');
+  };
+
+  const closeDropdown = () => {
+    dropdown.hidden = true;
+    combobox.classList.remove('is-open');
+    input.setAttribute('aria-expanded', 'false');
+  };
+
+  toggle?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropdown.hidden) {
+      input.focus();
+      openDropdown();
+    } else {
+      closeDropdown();
+    }
+  });
+
+  input.addEventListener('focus', () => {
+    openDropdown();
+  });
+
+  input.addEventListener('input', () => {
+    openDropdown();
+    updateDropdownList(input.value);
+    const currentVal = input.value.trim();
+    if (currentVal) {
+      localStorage.setItem(CITY_STORAGE_KEY, currentVal);
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      closeDropdown();
+      const currentVal = input.value.trim();
+      if (currentVal) {
+        saveCustomCity(currentVal);
+      }
+    }, 160);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDropdown();
+    } else if (e.key === 'Enter') {
+      if (!dropdown.hidden) {
+        const highlighted = dropdown.querySelector('.combobox-item.is-highlighted') || dropdown.querySelector('.combobox-item');
+        if (highlighted && (!input.value.trim() || dropdown.querySelector('.combobox-item.is-highlighted'))) {
+          input.value = highlighted.dataset.value;
+          saveCustomCity(highlighted.dataset.value);
+        }
+        closeDropdown();
+        e.preventDefault();
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (dropdown.hidden) {
+        openDropdown();
+        e.preventDefault();
+        return;
+      }
+      const items = Array.from(dropdown.querySelectorAll('.combobox-item'));
+      if (!items.length) return;
+      const currentIndex = items.findIndex((it) => it.classList.contains('is-highlighted'));
+      let nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+      if (nextIndex < 0) nextIndex = items.length - 1;
+      if (nextIndex >= items.length) nextIndex = 0;
+      items.forEach((it, idx) => it.classList.toggle('is-highlighted', idx === nextIndex));
+      items[nextIndex].scrollIntoView({ block: 'nearest' });
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!combobox.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+
+  bindDropdownItems();
+}
+
+  bindCityCombobox();
   document.querySelector('#checkout-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const details = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const city = (details.city || '').trim();
+    if (!city) {
+      document.querySelector('#checkout-city')?.focus();
+      showToast('Please enter or select your city');
+      return;
+    }
+    saveCustomCity(city);
     const items = state.cart.length ? state.cart : [{ product: products[1], qty: 1 }];
     const lines = items.map(({ product, qty }) => `- ${product.name} (${product.sku}) x ${qty} — ${formatPrice(product.price * qty)}`).join('\n');
     const total = items.reduce((sum, item) => sum + item.product.price * item.qty, 0);
-    const message = `Assalam-o-Alaikum Maqsood Fans,\n\nI would like to place an order.\n\nProducts:\n${lines}\n\nCustomer details:\nName: ${details.fullName}\nWhatsApp: ${details.phone}\nCity: ${details.city}\nAddress: ${details.address}${details.notes ? `\nNotes: ${details.notes}` : ''}\n\nEstimated total: ${formatPrice(total)}\n\nPlease confirm availability and delivery timing.`;
+    const message = `Assalam-o-Alaikum Maqsood Fans,\n\nI would like to place an order.\n\nProducts:\n${lines}\n\nCustomer details:\nName: ${details.fullName}\nWhatsApp: ${details.phone}\nCity: ${city}\nAddress: ${details.address}${details.notes ? `\nNotes: ${details.notes}` : ''}\n\nEstimated total: ${formatPrice(total)}\n\nPlease confirm availability and delivery timing.`;
     window.location.href = whatsappUrl(message);
   });
 }
