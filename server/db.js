@@ -24,7 +24,7 @@ export async function getPool() {
   return pool;
 }
 
-// In-memory fallback state so the application functions seamlessly without DATABASE_URL
+// ─── In-memory fallback state ────────────────────────────────────────────────
 let memoryPassword = 'maqsood123';
 
 let memoryProducts = seedProducts.map((p) => ({
@@ -63,8 +63,123 @@ for (const [productId, reviews] of Object.entries(reviewsByProduct)) {
   }
 }
 
+// ─── Vercel Blob persistent storage ─────────────────────────────────────────
+// Activated when BLOB_READ_WRITE_TOKEN is set and DATABASE_URL is not set.
+// Stores three JSON blobs:
+//   maqsood-data/products.json   – full products array
+//   maqsood-data/reviews.json    – full reviews array
+//   maqsood-data/settings.json   – admin password and site settings
+//
+// Memory arrays above are used as a write-through cache within each
+// serverless container lifetime. On cold start, they are rehydrated from blob.
+
+const BLOB_PRODUCTS = 'maqsood-data/products.json';
+const BLOB_REVIEWS  = 'maqsood-data/reviews.json';
+const BLOB_SETTINGS = 'maqsood-data/settings.json';
+
+let blobReady = false;        // true after ensureBlobInit() has run
+let blobUrlMap = {};          // { [pathname]: cachedPublicUrl }
+
+/** Returns true when Blob storage should be used instead of memory. */
+function usesBlob() {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN) && !process.env.DATABASE_URL;
+}
+
+/**
+ * Fetches a JSON blob by its pathname.
+ * On cold start, uses list() to locate the blob URL, then caches it.
+ * On warm container, uses the cached URL directly.
+ */
+async function blobRead(pathname) {
+  try {
+    // Try cached URL from this container's lifetime first
+    if (blobUrlMap[pathname]) {
+      const r = await fetch(`${blobUrlMap[pathname]}?_=${Date.now()}`);
+      if (r.ok) return r.json();
+    }
+    // Locate via list() (needed after each cold start)
+    const { list } = await import('@vercel/blob');
+    const { blobs } = await list({
+      prefix: pathname,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      limit: 10
+    });
+    const match = blobs.find((b) => b.pathname === pathname);
+    if (!match) return null;
+    blobUrlMap[pathname] = match.url;
+    const r = await fetch(`${match.url}?_=${Date.now()}`);
+    return r.ok ? r.json() : null;
+  } catch (err) {
+    console.warn(`blobRead(${pathname}):`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Writes data as a JSON blob. The blob is public-readable so the
+ * serverless function can fetch it without auth. The write requires the
+ * server-side BLOB_READ_WRITE_TOKEN and is never exposed to the browser.
+ */
+async function blobWrite(pathname, data) {
+  try {
+    const { put } = await import('@vercel/blob');
+    const result = await put(pathname, JSON.stringify(data), {
+      access: 'public',
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      contentType: 'application/json'
+    });
+    blobUrlMap[pathname] = result.url;
+  } catch (err) {
+    console.warn(`blobWrite(${pathname}):`, err.message);
+  }
+}
+
+/**
+ * Called once per cold start (or on first CRUD operation).
+ * Loads persisted data into the in-memory arrays.
+ * If no blob exists yet (first deploy), seeds the blob from current memory.
+ */
+async function ensureBlobInit() {
+  if (blobReady || !usesBlob()) return;
+  blobReady = true; // set before awaits to prevent concurrent re-entry
+
+  // Products
+  const savedProducts = await blobRead(BLOB_PRODUCTS);
+  if (Array.isArray(savedProducts) && savedProducts.length > 0) {
+    memoryProducts = savedProducts;
+  } else {
+    // First-time: persist the seed data so future cold starts load correctly
+    await blobWrite(BLOB_PRODUCTS, memoryProducts);
+  }
+
+  // Reviews
+  const savedReviews = await blobRead(BLOB_REVIEWS);
+  if (Array.isArray(savedReviews)) {
+    memoryReviews = savedReviews;
+    if (savedReviews.length > 0) {
+      nextReviewId = Math.max(...savedReviews.map((r) => Number(r.id) || 0)) + 1;
+    }
+  } else {
+    await blobWrite(BLOB_REVIEWS, memoryReviews);
+  }
+
+  // Settings (admin password)
+  const savedSettings = await blobRead(BLOB_SETTINGS);
+  if (savedSettings?.adminPassword) {
+    memoryPassword = savedSettings.adminPassword;
+  } else {
+    await blobWrite(BLOB_SETTINGS, { adminPassword: memoryPassword });
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function initDb() {
-  if (!process.env.DATABASE_URL) return;
+  // No DATABASE_URL → try Vercel Blob, otherwise stay in-memory
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await ensureBlobInit();
+    return;
+  }
   try {
     const db = await getPool();
     await db.query(`CREATE TABLE IF NOT EXISTS products (id VARCHAR(80) PRIMARY KEY, sku VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, price INT NOT NULL, old_price INT NOT NULL, discount VARCHAR(40) NOT NULL DEFAULT '', rating DECIMAL(3,1) NOT NULL DEFAULT 0, reviews_count INT NOT NULL DEFAULT 0, image LONGTEXT NOT NULL, image_2 LONGTEXT NULL, image_3 LONGTEXT NULL, image_4 LONGTEXT NULL, category VARCHAR(100) NOT NULL, color VARCHAR(100) NOT NULL DEFAULT '', blades VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(80) NOT NULL DEFAULT '', description TEXT NOT NULL, stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
@@ -85,7 +200,10 @@ export async function initDb() {
 }
 
 export async function getAdminPassword() {
-  if (!process.env.DATABASE_URL) return memoryPassword;
+  if (!process.env.DATABASE_URL) {
+    await ensureBlobInit();
+    return memoryPassword;
+  }
   try {
     const db = await getPool();
     const [rows] = await db.query("SELECT setting_value FROM site_settings WHERE setting_key = 'admin_password'");
@@ -97,7 +215,10 @@ export async function getAdminPassword() {
 
 export async function setAdminPassword(newPassword) {
   memoryPassword = newPassword;
-  if (!process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await blobWrite(BLOB_SETTINGS, { adminPassword: newPassword });
+    return;
+  }
   try {
     const db = await getPool();
     await db.query("INSERT INTO site_settings (setting_key, setting_value) VALUES ('admin_password', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)", [newPassword]);
@@ -134,7 +255,10 @@ export function mapReview(row) {
 }
 
 export async function listProducts() {
-  if (!process.env.DATABASE_URL) return memoryProducts;
+  if (!process.env.DATABASE_URL) {
+    await ensureBlobInit();
+    return memoryProducts;
+  }
   try {
     const db = await getPool();
     const [rows] = await db.query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products ORDER BY created_at ASC, id ASC');
@@ -174,7 +298,10 @@ export async function saveProduct(input, id = input.id) {
     memoryProducts.push(formatted);
   }
 
-  if (!process.env.DATABASE_URL) return formatted;
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await blobWrite(BLOB_PRODUCTS, memoryProducts);
+    return formatted;
+  }
   try {
     const db = await getPool();
     const values = [
@@ -211,7 +338,10 @@ export async function saveProduct(input, id = input.id) {
 
 export async function removeProduct(id) {
   memoryProducts = memoryProducts.filter((p) => p.id !== id);
-  if (!process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await blobWrite(BLOB_PRODUCTS, memoryProducts);
+    return;
+  }
   try {
     const db = await getPool();
     await db.query('DELETE FROM products WHERE id = ?', [id]);
@@ -222,6 +352,7 @@ export async function removeProduct(id) {
 
 export async function listReviews(productId) {
   if (!process.env.DATABASE_URL) {
+    await ensureBlobInit();
     return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
   }
   try {
@@ -256,7 +387,10 @@ export async function saveReview(input, id = input.id) {
     memoryReviews.unshift(formatted);
   }
 
-  if (!process.env.DATABASE_URL) return formatted;
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await blobWrite(BLOB_REVIEWS, memoryReviews);
+    return formatted;
+  }
   try {
     const db = await getPool();
     if (id) {
@@ -277,7 +411,10 @@ export async function saveReview(input, id = input.id) {
 export async function removeReview(id) {
   const numId = Number(id);
   memoryReviews = memoryReviews.filter((r) => r.id !== numId);
-  if (!process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) {
+    if (usesBlob()) await blobWrite(BLOB_REVIEWS, memoryReviews);
+    return;
+  }
   try {
     const db = await getPool();
     await db.query('DELETE FROM product_reviews WHERE id=?', [id]);
