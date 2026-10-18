@@ -131,3 +131,7 @@
 .combobox-item small{font-size:9px;color:var(--green);font-weight:600;background:#edf7f0;padding:2px 6px;border-radius:2px}
 .combobox-item.custom{color:var(--muted);border-top:1px dashed var(--line);font-style:italic}
 .combobox-item.custom strong{color:var(--gold-dark);font-style:normal}
+.admin-field .combobox-wrap{margin-top:0}
+.admin-field-color{position:relative}
+.combobox-badge-preset{font-size:9px;color:var(--gold-dark);font-weight:600;background:#fdf5e6;padding:2px 6px;border-radius:2px}
+.combobox-badge-custom{font-size:9px;color:var(--green);font-weight:600;background:#edf7f0;padding:2px 6px;border-radius:2px}

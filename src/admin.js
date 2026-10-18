@@ -2,12 +2,69 @@ import { formatPrice, products as seedProducts, reviewsByProduct as seedReviewsB
 
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
+const DEFAULT_COLORS = ['Ivory', 'Black / Gold', 'Pearl White', 'Walnut', 'Champagne Gold', 'Snow White'];
+const COLOR_STORAGE_KEY = 'maqsood_custom_colors';
+
+function getCustomColors() {
+  try {
+    const raw = localStorage.getItem(COLOR_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((c) => typeof c === 'string' && c.trim());
+    }
+  } catch {}
+  return [];
+}
+
+function saveCustomColor(color) {
+  if (!color || typeof color !== 'string') return;
+  const trimmed = color.trim();
+  if (!trimmed) return;
+  try {
+    const customColors = getCustomColors();
+    const allKnown = [...DEFAULT_COLORS, ...customColors];
+    const exists = allKnown.some((c) => c.toLowerCase() === trimmed.toLowerCase());
+    if (!exists) {
+      customColors.push(trimmed);
+      localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(customColors));
+    }
+  } catch (err) {
+    console.warn('Failed to save custom color:', err);
+  }
+}
+
+function getAllColors(currentColor = '') {
+  const customColors = getCustomColors();
+  let productColors = [];
+  try {
+    const cached = localStorage.getItem('maqsood_admin_products');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        productColors = parsed.map((p) => (p.color || '').trim()).filter(Boolean);
+      }
+    }
+  } catch {}
+
+  const seen = new Set();
+  const list = [];
+  [...DEFAULT_COLORS, ...customColors, ...productColors, (currentColor || '').trim()].forEach((col) => {
+    if (!col) return;
+    const lower = col.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      list.push(col);
+    }
+  });
+  return list;
+}
+
 const selectOptions = {
   category: ['Premium', 'Designer', 'Natural', 'Everyday'],
   stockStatus: [['in_stock', 'In stock'], ['out_of_stock', 'Out of stock / Sold out']],
   discount: ['', '15% OFF', '20% OFF', '25% OFF', '30% OFF', 'New'],
   rating: ['4', '4.5', '4.6', '4.7', '4.8', '4.9', '5'],
-  color: ['Ivory', 'Black / Gold', 'Pearl White', 'Walnut', 'Champagne Gold', 'Snow White'],
+  color: DEFAULT_COLORS,
   blades: ['3 blade', '4 blade', '5 blade'],
   size: ['48 inch', '52 inch', '56 inch']
 };
@@ -27,7 +84,7 @@ const productFields = [
   ['image4', 'Additional image 4', 'image', false],
   ['category', 'Category', 'select', true],
   ['stockStatus', 'Availability', 'select', true],
-  ['color', 'Finish / color detail', 'select', false],
+  ['color', 'Finish / color detail', 'combobox', false],
   ['blades', 'Blade detail', 'select', false],
   ['size', 'Size', 'select', false],
   ['description', 'Description', 'textarea', true]
@@ -35,6 +92,14 @@ const productFields = [
 
 function inputField([key, label, type, required], product) {
   if (type === 'textarea') return `<label class="admin-field admin-field-wide">${label}${required ? ' *' : ''}<textarea name="${key}" ${required ? 'required' : ''}>${esc(product[key] || '')}</textarea></label>`;
+  if (key === 'color' || type === 'combobox') {
+    const currentVal = String(product[key] || '').trim();
+    const colors = getAllColors(currentVal);
+    return `<label class="admin-field admin-field-color">${label}${required ? ' *' : ''}<div class="combobox-wrap admin-combobox-wrap" id="admin-color-combobox"><input name="${key}" id="input-${key}" class="combobox-input admin-combobox-input" type="text" value="${esc(currentVal)}" placeholder="Select or type custom color (e.g. Ivory, Matte Charcoal)" autocomplete="off" aria-autocomplete="list" aria-expanded="false" ${required ? 'required' : ''}/><button type="button" class="combobox-toggle admin-combobox-toggle" aria-label="Toggle color options" tabindex="-1"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg></button><ul class="combobox-dropdown admin-combobox-dropdown" id="admin-color-dropdown" role="listbox" hidden>${colors.map((col) => {
+      const isPreset = DEFAULT_COLORS.some(dc => dc.toLowerCase() === col.toLowerCase());
+      return `<li class="combobox-item ${col.toLowerCase() === currentVal.toLowerCase() ? 'is-selected' : ''}" data-value="${esc(col)}" role="option"><span>${esc(col)}</span>${isPreset ? '<small class="combobox-badge-preset">Preset</small>' : '<small class="combobox-badge-custom">Custom</small>'}</li>`;
+    }).join('')}</ul></div></label>`;
+  }
   if (type === 'select') {
     const current = String(product[key] ?? '');
     const options = [...(selectOptions[key] || [])];
@@ -271,7 +336,145 @@ async function renderAdminWorkspace(root) {
   }));
 }
 
+function bindColorCombobox(root) {
+  const combobox = root.querySelector('#admin-color-combobox');
+  if (!combobox) return;
+  const input = combobox.querySelector('#input-color');
+  const toggle = combobox.querySelector('.combobox-toggle');
+  const dropdown = combobox.querySelector('#admin-color-dropdown');
+  if (!input || !dropdown) return;
+
+  const updateDropdownList = (filterText = '') => {
+    const query = filterText.trim().toLowerCase();
+    const allColors = getAllColors(input.value.trim());
+    const matches = query ? allColors.filter((c) => c.toLowerCase().includes(query)) : allColors;
+    let html = '';
+
+    if (query && !allColors.some((c) => c.toLowerCase() === query)) {
+      const customTitle = filterText.trim();
+      html += `<li class="combobox-item custom" data-value="${esc(customTitle)}" role="option"><span>Add custom color: <strong>${esc(customTitle)}</strong></span></li>`;
+    }
+
+    html += matches.map((col) => {
+      const isPreset = DEFAULT_COLORS.some(dc => dc.toLowerCase() === col.toLowerCase());
+      const isSelected = col.toLowerCase() === input.value.trim().toLowerCase();
+      return `
+        <li class="combobox-item ${isSelected ? 'is-selected' : ''}" data-value="${esc(col)}" role="option">
+          <span>${esc(col)}</span>
+          ${isPreset ? '<small class="combobox-badge-preset">Preset</small>' : '<small class="combobox-badge-custom">Custom</small>'}
+        </li>
+      `;
+    }).join('');
+
+    if (!html) {
+      const customTitle = filterText.trim() || 'Custom color';
+      html = `<li class="combobox-item custom" data-value="${esc(customTitle)}" role="option"><span>Add custom color: <strong>${esc(customTitle)}</strong></span></li>`;
+    }
+
+    dropdown.innerHTML = html;
+    bindDropdownItems();
+  };
+
+  const bindDropdownItems = () => {
+    dropdown.querySelectorAll('.combobox-item').forEach((item) => {
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const val = item.dataset.value;
+        if (val) {
+          input.value = val;
+          saveCustomColor(val);
+        }
+        closeDropdown();
+      });
+    });
+  };
+
+  const openDropdown = () => {
+    updateDropdownList(input.value);
+    dropdown.hidden = false;
+    combobox.classList.add('is-open');
+    input.setAttribute('aria-expanded', 'true');
+  };
+
+  const closeDropdown = () => {
+    dropdown.hidden = true;
+    combobox.classList.remove('is-open');
+    input.setAttribute('aria-expanded', 'false');
+  };
+
+  toggle?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (dropdown.hidden) {
+      input.focus();
+      openDropdown();
+    } else {
+      closeDropdown();
+    }
+  });
+
+  input.addEventListener('focus', () => {
+    openDropdown();
+  });
+
+  input.addEventListener('input', () => {
+    openDropdown();
+    updateDropdownList(input.value);
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => {
+      closeDropdown();
+      const currentVal = input.value.trim();
+      if (currentVal) {
+        saveCustomColor(currentVal);
+      }
+    }, 180);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeDropdown();
+    } else if (e.key === 'Enter') {
+      if (!dropdown.hidden) {
+        const highlighted = dropdown.querySelector('.combobox-item.is-highlighted') || dropdown.querySelector('.combobox-item');
+        if (highlighted && dropdown.querySelector('.combobox-item.is-highlighted')) {
+          input.value = highlighted.dataset.value;
+          saveCustomColor(highlighted.dataset.value);
+        } else if (input.value.trim()) {
+          saveCustomColor(input.value.trim());
+        }
+        closeDropdown();
+        e.preventDefault();
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (dropdown.hidden) {
+        openDropdown();
+        e.preventDefault();
+        return;
+      }
+      const items = Array.from(dropdown.querySelectorAll('.combobox-item'));
+      if (!items.length) return;
+      const currentIndex = items.findIndex((it) => it.classList.contains('is-highlighted'));
+      let nextIndex = e.key === 'ArrowDown' ? currentIndex + 1 : currentIndex - 1;
+      if (nextIndex < 0) nextIndex = items.length - 1;
+      if (nextIndex >= items.length) nextIndex = 0;
+      items.forEach((it, idx) => it.classList.toggle('is-highlighted', idx === nextIndex));
+      items[nextIndex].scrollIntoView({ block: 'nearest' });
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!combobox.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+}
+
 function bindProductForm(root, editingId) {
+  bindColorCombobox(root);
+
   root.querySelector('#admin-cancel').addEventListener('click', () => {
     root.querySelector('#admin-editor').innerHTML = '';
   });
@@ -323,6 +526,9 @@ function bindProductForm(root, editingId) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget).entries());
     ['price', 'oldPrice', 'rating', 'reviews'].forEach(k => data[k] = Number(data[k] || 0));
+    if (data.color) {
+      saveCustomColor(data.color);
+    }
     try {
       await fetch(editingId ? `/api/admin/products/${editingId}` : '/api/admin/products', {
         method: editingId ? 'PUT' : 'POST',
