@@ -64,7 +64,7 @@ for (const [productId, reviews] of Object.entries(reviewsByProduct)) {
 }
 
 // ─── Vercel Blob persistent storage ─────────────────────────────────────────
-// Activated when BLOB_READ_WRITE_TOKEN is set and DATABASE_URL is not set.
+// Activated when BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is set and DATABASE_URL is not set.
 // Stores three JSON blobs:
 //   maqsood-data/products.json   – full products array
 //   maqsood-data/reviews.json    – full reviews array
@@ -82,7 +82,14 @@ let blobUrlMap = {};          // { [pathname]: cachedPublicUrl }
 
 /** Returns true when Blob storage should be used instead of memory. */
 function usesBlob() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN) && !process.env.DATABASE_URL;
+  return (Boolean(process.env.BLOB_READ_WRITE_TOKEN) || Boolean(process.env.BLOB_STORE_ID)) && !process.env.DATABASE_URL;
+}
+
+/** Returns blob options — passes token explicitly only when available. */
+function blobOpts() {
+  const opts = {};
+  if (process.env.BLOB_READ_WRITE_TOKEN) opts.token = process.env.BLOB_READ_WRITE_TOKEN;
+  return opts;
 }
 
 /**
@@ -101,7 +108,7 @@ async function blobRead(pathname) {
     const { list } = await import('@vercel/blob');
     const { blobs } = await list({
       prefix: pathname,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...blobOpts(),
       limit: 10
     });
     const match = blobs.find((b) => b.pathname === pathname);
@@ -126,7 +133,7 @@ async function blobWrite(pathname, data) {
     const result = await put(pathname, JSON.stringify(data), {
       access: 'public',
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+      ...blobOpts(),
       contentType: 'application/json'
     });
     blobUrlMap[pathname] = result.url;
