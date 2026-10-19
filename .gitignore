@@ -7,3 +7,5 @@ Thumbs.db
 
 .vercel
 *.backup
+
+.env*
