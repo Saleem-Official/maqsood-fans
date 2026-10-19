@@ -77,8 +77,8 @@ const BLOB_PRODUCTS = 'maqsood-data/products.json';
 const BLOB_REVIEWS  = 'maqsood-data/reviews.json';
 const BLOB_SETTINGS = 'maqsood-data/settings.json';
 
-let blobReady = false;        // true after ensureBlobInit() has run
-let blobUrlMap = {};          // { [pathname]: cachedPublicUrl }
+let blobAccessLevel = 'private'; // Vercel Blob store default is private
+let blobInitPromise = null;      // Prevents race conditions on cold start
 
 /** Returns true when Blob storage should be used instead of memory. */
 function usesBlob() {
@@ -94,28 +94,35 @@ function blobOpts() {
 
 /**
  * Fetches a JSON blob by its pathname.
- * On cold start, uses list() to locate the blob URL, then caches it.
- * On warm container, uses the cached URL directly.
+ * Uses @vercel/blob's built-in get() with authentication.
+ * Automatically handles private vs public store access.
  */
 async function blobRead(pathname) {
   try {
-    // Try cached URL from this container's lifetime first
-    if (blobUrlMap[pathname]) {
-      const r = await fetch(`${blobUrlMap[pathname]}?_=${Date.now()}`);
-      if (r.ok) return r.json();
+    const { get } = await import('@vercel/blob');
+    let res = null;
+    try {
+      res = await get(pathname, {
+        access: blobAccessLevel,
+        useCache: false,
+        ...blobOpts()
+      });
+    } catch (err) {
+      if (err.message && err.message.includes('Cannot use')) {
+        blobAccessLevel = blobAccessLevel === 'private' ? 'public' : 'private';
+        res = await get(pathname, {
+          access: blobAccessLevel,
+          useCache: false,
+          ...blobOpts()
+        });
+      } else {
+        throw err;
+      }
     }
-    // Locate via list() (needed after each cold start)
-    const { list } = await import('@vercel/blob');
-    const { blobs } = await list({
-      prefix: pathname,
-      ...blobOpts(),
-      limit: 10
-    });
-    const match = blobs.find((b) => b.pathname === pathname);
-    if (!match) return null;
-    blobUrlMap[pathname] = match.url;
-    const r = await fetch(`${match.url}?_=${Date.now()}`);
-    return r.ok ? r.json() : null;
+    if (!res || !res.stream) return null;
+    const text = await new Response(res.stream).text();
+    if (!text) return null;
+    return JSON.parse(text);
   } catch (err) {
     console.warn(`blobRead(${pathname}):`, err.message);
     return null;
@@ -123,61 +130,82 @@ async function blobRead(pathname) {
 }
 
 /**
- * Writes data as a JSON blob. The blob is public-readable so the
- * serverless function can fetch it without auth. The write requires the
- * server-side BLOB_READ_WRITE_TOKEN and is never exposed to the browser.
+ * Writes data as a JSON blob.
+ * Automatically handles private vs public store access.
  */
 async function blobWrite(pathname, data) {
   try {
     const { put } = await import('@vercel/blob');
-    const result = await put(pathname, JSON.stringify(data), {
-      access: 'public',
-      addRandomSuffix: false,
-      ...blobOpts(),
-      contentType: 'application/json'
-    });
-    blobUrlMap[pathname] = result.url;
+    const body = JSON.stringify(data);
+    try {
+      await put(pathname, body, {
+        access: blobAccessLevel,
+        addRandomSuffix: false,
+        allowOverwrite: true,
+        ...blobOpts(),
+        contentType: 'application/json'
+      });
+    } catch (err) {
+      if (err.message && err.message.includes('Cannot use')) {
+        blobAccessLevel = blobAccessLevel === 'private' ? 'public' : 'private';
+        await put(pathname, body, {
+          access: blobAccessLevel,
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          ...blobOpts(),
+          contentType: 'application/json'
+        });
+      } else {
+        throw err;
+      }
+    }
   } catch (err) {
-    console.warn(`blobWrite(${pathname}):`, err.message);
+    console.error(`blobWrite(${pathname}) FAILED:`, err.message);
   }
 }
 
 /**
- * Called once per cold start (or on first CRUD operation).
+ * Called once per cold start (or on CRUD operation).
  * Loads persisted data into the in-memory arrays.
+ * Concurrent requests await the exact same promise so un-hydrated data is never served.
  * If no blob exists yet (first deploy), seeds the blob from current memory.
  */
 async function ensureBlobInit() {
-  if (blobReady || !usesBlob()) return;
-  blobReady = true; // set before awaits to prevent concurrent re-entry
+  if (!usesBlob()) return;
+  if (!blobInitPromise) {
+    blobInitPromise = (async () => {
+      // Products
+      const savedProducts = await blobRead(BLOB_PRODUCTS);
+      if (Array.isArray(savedProducts) && savedProducts.length > 0) {
+        memoryProducts = savedProducts;
+      } else if (savedProducts === null) {
+        await blobWrite(BLOB_PRODUCTS, memoryProducts);
+      }
 
-  // Products
-  const savedProducts = await blobRead(BLOB_PRODUCTS);
-  if (Array.isArray(savedProducts) && savedProducts.length > 0) {
-    memoryProducts = savedProducts;
-  } else {
-    // First-time: persist the seed data so future cold starts load correctly
-    await blobWrite(BLOB_PRODUCTS, memoryProducts);
-  }
+      // Reviews
+      const savedReviews = await blobRead(BLOB_REVIEWS);
+      if (Array.isArray(savedReviews)) {
+        memoryReviews = savedReviews;
+        if (savedReviews.length > 0) {
+          nextReviewId = Math.max(...savedReviews.map((r) => Number(r.id) || 0)) + 1;
+        }
+      } else if (savedReviews === null) {
+        await blobWrite(BLOB_REVIEWS, memoryReviews);
+      }
 
-  // Reviews
-  const savedReviews = await blobRead(BLOB_REVIEWS);
-  if (Array.isArray(savedReviews)) {
-    memoryReviews = savedReviews;
-    if (savedReviews.length > 0) {
-      nextReviewId = Math.max(...savedReviews.map((r) => Number(r.id) || 0)) + 1;
-    }
-  } else {
-    await blobWrite(BLOB_REVIEWS, memoryReviews);
+      // Settings (admin password)
+      const savedSettings = await blobRead(BLOB_SETTINGS);
+      if (savedSettings?.adminPassword) {
+        memoryPassword = savedSettings.adminPassword;
+      } else if (savedSettings === null) {
+        await blobWrite(BLOB_SETTINGS, { adminPassword: memoryPassword });
+      }
+    })().catch((err) => {
+      console.error('ensureBlobInit failed:', err);
+      blobInitPromise = null;
+    });
   }
-
-  // Settings (admin password)
-  const savedSettings = await blobRead(BLOB_SETTINGS);
-  if (savedSettings?.adminPassword) {
-    memoryPassword = savedSettings.adminPassword;
-  } else {
-    await blobWrite(BLOB_SETTINGS, { adminPassword: memoryPassword });
-  }
+  await blobInitPromise;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -221,6 +249,7 @@ export async function getAdminPassword() {
 }
 
 export async function setAdminPassword(newPassword) {
+  await ensureBlobInit();
   memoryPassword = newPassword;
   if (!process.env.DATABASE_URL) {
     if (usesBlob()) await blobWrite(BLOB_SETTINGS, { adminPassword: newPassword });
@@ -277,6 +306,7 @@ export async function listProducts() {
 }
 
 export async function saveProduct(input, id = input.id) {
+  await ensureBlobInit();
   const formatted = {
     id: id || input.id || `product-${Date.now()}`,
     sku: input.sku || `MF-${Date.now().toString().slice(-4)}`,
@@ -344,6 +374,7 @@ export async function saveProduct(input, id = input.id) {
 }
 
 export async function removeProduct(id) {
+  await ensureBlobInit();
   memoryProducts = memoryProducts.filter((p) => p.id !== id);
   if (!process.env.DATABASE_URL) {
     if (usesBlob()) await blobWrite(BLOB_PRODUCTS, memoryProducts);
@@ -378,6 +409,7 @@ export async function listReviews(productId) {
 }
 
 export async function saveReview(input, id = input.id) {
+  await ensureBlobInit();
   const formatted = {
     id: id ? Number(id) : nextReviewId++,
     productId: input.productId,
@@ -416,6 +448,7 @@ export async function saveReview(input, id = input.id) {
 }
 
 export async function removeReview(id) {
+  await ensureBlobInit();
   const numId = Number(id);
   memoryReviews = memoryReviews.filter((r) => r.id !== numId);
   if (!process.env.DATABASE_URL) {
