@@ -35,16 +35,6 @@ function saveCustomColor(color) {
 
 function getAllColors(currentColor = '') {
   const customColors = getCustomColors();
-  let productColors = [];
-  try {
-    const cached = localStorage.getItem('maqsood_admin_products');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
-        productColors = parsed.map((p) => (p.color || '').trim()).filter(Boolean);
-      }
-    }
-  } catch {}
 
   const seen = new Set();
   const list = [];
@@ -223,7 +213,30 @@ function openPasswordModal() {
   });
 }
 
+let adminToastTimer = null;
+function showAdminToast(message, type = 'info') {
+  let toast = document.querySelector('#admin-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'admin-toast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.className = `toast toast-${type} show`;
+  const icon = type === 'error' ? '⚠️' : type === 'success' ? '✓' : 'ℹ️';
+  toast.innerHTML = `<span style="font-size:13px">${icon}</span> <span>${esc(message)}</span>`;
+  if (adminToastTimer) clearTimeout(adminToastTimer);
+  adminToastTimer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, 4000);
+}
+
 async function renderAdminWorkspace(root) {
+  try {
+    localStorage.removeItem('maqsood_admin_products');
+    localStorage.removeItem('maqsood_admin_reviews');
+  } catch {}
+
   const topbarRight = document.querySelector('#admin-topbar-right');
   if (topbarRight) {
     topbarRight.innerHTML = `<a href="https://maqsoodfans.com" class="admin-action-pill" target="_blank" rel="noopener">🌐 View Live Store</a><button class="admin-action-pill" id="admin-change-pass-btn">🔑 Change Password</button><button class="admin-action-pill" id="admin-lock-btn">🔒 Lock</button>`;
@@ -233,39 +246,29 @@ async function renderAdminWorkspace(root) {
 
   let products = [];
   let reviews = [];
+  let fetchError = null;
 
   try {
-    const [productsResponse, reviewsResponse] = await Promise.all([fetch('/api/admin/products'), fetch('/api/admin/reviews')]);
-    if (productsResponse.ok) products = await productsResponse.json();
-    if (reviewsResponse.ok) reviews = await reviewsResponse.json();
+    const [productsResponse, reviewsResponse] = await Promise.all([
+      fetch(`/api/admin/products?_t=${Date.now()}`, { cache: 'no-store' }),
+      fetch(`/api/admin/reviews?_t=${Date.now()}`, { cache: 'no-store' })
+    ]);
+    if (productsResponse.ok) {
+      products = await productsResponse.json();
+    } else {
+      const err = await productsResponse.json().catch(() => ({}));
+      fetchError = err.error || `HTTP ${productsResponse.status} loading products`;
+    }
+    if (reviewsResponse.ok) {
+      reviews = await reviewsResponse.json();
+    }
   } catch (err) {
+    fetchError = err.message;
     console.warn('API fetch warning:', err.message);
   }
 
-  if (!products || !products.length) {
-    try {
-      const cached = localStorage.getItem('maqsood_admin_products');
-      if (cached) products = JSON.parse(cached);
-    } catch {}
-    if (!products || !products.length) {
-      products = [...seedProducts];
-    }
-  }
-
-  if (!reviews || !reviews.length) {
-    try {
-      const cached = localStorage.getItem('maqsood_admin_reviews');
-      if (cached) reviews = JSON.parse(cached);
-    } catch {}
-    if (!reviews || !reviews.length) {
-      reviews = [];
-      let revId = 1;
-      for (const [prodId, rList] of Object.entries(seedReviewsByProduct)) {
-        for (const r of rList) {
-          reviews.push({ id: revId++, productId: prodId, name: r.name, date: r.date, rating: Number(r.rating), text: r.text });
-        }
-      }
-    }
+  if (fetchError) {
+    showAdminToast(`Warning: ${fetchError}`, 'error');
   }
 
   root.innerHTML = `<div class="admin-toolbar"><div><b>${products.length} products · ${reviews.length} reviews</b><span>Catalogue Workspace</span></div><div class="admin-toolbar-actions"><button class="button button-gold" id="admin-add">+ Add product</button><button class="button button-light" id="admin-add-review">+ Add review</button><button class="button button-light" id="admin-change-pass-tb">🔑 Change password</button></div></div><div id="admin-pass-modal-wrap"></div><div id="admin-editor"></div><h2 class="admin-section-title">Products</h2>${productTable(products)}<h2 class="admin-section-title">Customer reviews</h2><div id="admin-review-editor"></div>${reviewTable(reviews, products)}`;
@@ -288,20 +291,22 @@ async function renderAdminWorkspace(root) {
   root.querySelectorAll('[data-delete-product]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Delete this product from the catalogue?')) return;
     const id = b.dataset.deleteProduct;
+    b.disabled = true;
+    b.textContent = 'Deleting…';
     try {
-      await fetch(`/api/admin/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to delete product (HTTP ${res.status})`);
+      }
+      showAdminToast('Product deleted successfully.', 'success');
+      await renderAdminWorkspace(root);
     } catch (err) {
-      console.warn('API delete error:', err);
+      console.error('API delete error:', err);
+      showAdminToast(err.message, 'error');
+      b.disabled = false;
+      b.textContent = 'Delete';
     }
-    try {
-      let list = [];
-      const cached = localStorage.getItem('maqsood_admin_products');
-      if (cached) list = JSON.parse(cached);
-      else list = [...seedProducts];
-      list = list.filter(p => p.id !== id);
-      localStorage.setItem('maqsood_admin_products', JSON.stringify(list));
-    } catch {}
-    await renderAdminWorkspace(root);
   }));
 
   const reviewEditor = root.querySelector('#admin-review-editor');
@@ -320,19 +325,22 @@ async function renderAdminWorkspace(root) {
   root.querySelectorAll('[data-delete-review]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Delete this review?')) return;
     const id = b.dataset.deleteReview;
+    b.disabled = true;
+    b.textContent = 'Deleting…';
     try {
-      await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/reviews/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to delete review (HTTP ${res.status})`);
+      }
+      showAdminToast('Review deleted successfully.', 'success');
+      await renderAdminWorkspace(root);
     } catch (err) {
-      console.warn('API delete review error:', err);
+      console.error('API delete review error:', err);
+      showAdminToast(err.message, 'error');
+      b.disabled = false;
+      b.textContent = 'Delete';
     }
-    try {
-      let list = [];
-      const cached = localStorage.getItem('maqsood_admin_reviews');
-      if (cached) list = JSON.parse(cached);
-      list = list.filter(r => String(r.id) !== String(id));
-      localStorage.setItem('maqsood_admin_reviews', JSON.stringify(list));
-    } catch {}
-    await renderAdminWorkspace(root);
   }));
 }
 
@@ -522,37 +530,45 @@ function bindProductForm(root, editingId) {
     });
   });
 
-  root.querySelector('#admin-product-form').addEventListener('submit', async e => {
+  const productFormEl = root.querySelector('#admin-product-form');
+  productFormEl.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const submitBtn = productFormEl.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.textContent : 'Save';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving to database…';
+    }
+
+    const data = Object.fromEntries(new FormData(productFormEl).entries());
     ['price', 'oldPrice', 'rating', 'reviews'].forEach(k => data[k] = Number(data[k] || 0));
     if (data.color) {
       saveCustomColor(data.color);
     }
+    const targetUrl = editingId ? `/api/admin/products/${encodeURIComponent(editingId)}` : '/api/admin/products';
+    const method = editingId ? 'PUT' : 'POST';
+
     try {
-      await fetch(editingId ? `/api/admin/products/${editingId}` : '/api/admin/products', {
-        method: editingId ? 'PUT' : 'POST',
+      const res = await fetch(targetUrl, {
+        method,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(data)
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to save product (HTTP ${res.status})`);
+      }
+      showAdminToast(editingId ? 'Product updated successfully!' : 'Product added successfully!', 'success');
+      root.querySelector('#admin-editor').innerHTML = '';
+      await renderAdminWorkspace(root);
     } catch (err) {
-      console.warn('API save error:', err);
+      console.error('API save error:', err);
+      showAdminToast(`Could not save product: ${err.message}`, 'error');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
-
-    try {
-      let list = [];
-      const cached = localStorage.getItem('maqsood_admin_products');
-      if (cached) list = JSON.parse(cached);
-      else list = [...seedProducts];
-      const prodId = editingId || data.id || `product-${Date.now()}`;
-      data.id = prodId;
-      const idx = list.findIndex(p => p.id === prodId);
-      if (idx >= 0) list[idx] = { ...list[idx], ...data };
-      else list.push(data);
-      localStorage.setItem('maqsood_admin_products', JSON.stringify(list));
-    } catch {}
-
-    await renderAdminWorkspace(root);
   });
 }
 
@@ -561,32 +577,41 @@ function bindReviewForm(root, editingId) {
     root.querySelector('#admin-review-editor').innerHTML = '';
   });
 
-  root.querySelector('#admin-review-form').addEventListener('submit', async e => {
+  const reviewFormEl = root.querySelector('#admin-review-form');
+  reviewFormEl.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const submitBtn = reviewFormEl.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.textContent : 'Save';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving to database…';
+    }
+
+    const data = Object.fromEntries(new FormData(reviewFormEl).entries());
     data.rating = Number(data.rating || 5);
+    const targetUrl = editingId ? `/api/admin/reviews/${encodeURIComponent(editingId)}` : '/api/admin/reviews';
+    const method = editingId ? 'PUT' : 'POST';
+
     try {
-      await fetch(editingId ? `/api/admin/reviews/${editingId}` : '/api/admin/reviews', {
-        method: editingId ? 'PUT' : 'POST',
+      const res = await fetch(targetUrl, {
+        method,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(data)
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to save review (HTTP ${res.status})`);
+      }
+      showAdminToast(editingId ? 'Review updated successfully!' : 'Review added successfully!', 'success');
+      root.querySelector('#admin-review-editor').innerHTML = '';
+      await renderAdminWorkspace(root);
     } catch (err) {
-      console.warn('API save review error:', err);
+      console.error('API save review error:', err);
+      showAdminToast(`Could not save review: ${err.message}`, 'error');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
-
-    try {
-      let list = [];
-      const cached = localStorage.getItem('maqsood_admin_reviews');
-      if (cached) list = JSON.parse(cached);
-      const revId = editingId ? Number(editingId) : Date.now();
-      data.id = revId;
-      const idx = list.findIndex(r => String(r.id) === String(revId));
-      if (idx >= 0) list[idx] = { ...list[idx], ...data };
-      else list.unshift(data);
-      localStorage.setItem('maqsood_admin_reviews', JSON.stringify(list));
-    } catch {}
-
-    await renderAdminWorkspace(root);
   });
 }

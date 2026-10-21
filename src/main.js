@@ -546,7 +546,7 @@ render();
 async function hydrateCatalog() {
   if (catalogHydrated) return;
   try {
-    const response = await fetch('/api/products');
+    const response = await fetch(`/api/products?_t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) return;
     const remoteProducts = await response.json();
     if (remoteProducts.length) {
@@ -556,7 +556,7 @@ async function hydrateCatalog() {
         return { product: fresh, qty: item.qty };
       });
       saveCartToStorage();
-      const reviewsResponse = await fetch('/api/reviews');
+      const reviewsResponse = await fetch(`/api/reviews?_t=${Date.now()}`, { cache: 'no-store' });
       if (reviewsResponse.ok) {
         const remoteReviews = await reviewsResponse.json();
         Object.keys(reviewsByProduct).forEach((key) => delete reviewsByProduct[key]);

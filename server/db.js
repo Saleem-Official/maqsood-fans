@@ -24,7 +24,7 @@ export async function getPool() {
   return pool;
 }
 
-// ─── In-memory fallback state ────────────────────────────────────────────────
+// In-memory fallback state so the application functions seamlessly without DATABASE_URL
 let memoryPassword = 'maqsood123';
 
 let memoryProducts = seedProducts.map((p) => ({
@@ -63,203 +63,224 @@ for (const [productId, reviews] of Object.entries(reviewsByProduct)) {
   }
 }
 
-// ─── Vercel Blob persistent storage ─────────────────────────────────────────
-// Activated when BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID is set and DATABASE_URL is not set.
-// Stores three JSON blobs:
-//   maqsood-data/products.json   – full products array
-//   maqsood-data/reviews.json    – full reviews array
-//   maqsood-data/settings.json   – admin password and site settings
-//
-// Memory arrays above are used as a write-through cache within each
-// serverless container lifetime. On cold start, they are rehydrated from blob.
-
+// ─── Vercel Blob Persistent Storage ──────────────────────────────────────────
 const BLOB_PRODUCTS = 'maqsood-data/products.json';
 const BLOB_REVIEWS  = 'maqsood-data/reviews.json';
 const BLOB_SETTINGS = 'maqsood-data/settings.json';
 
-let blobAccessLevel = 'private'; // Vercel Blob store default is private
-let blobInitPromise = null;      // Prevents race conditions on cold start
-
-/** Returns true when Blob storage should be used instead of memory. */
 function usesBlob() {
-  return (Boolean(process.env.BLOB_READ_WRITE_TOKEN) || Boolean(process.env.BLOB_STORE_ID)) && !process.env.DATABASE_URL;
+  return (Boolean(process.env.BLOB_STORE_ID) || Boolean(process.env.BLOB_READ_WRITE_TOKEN)) && !process.env.DATABASE_URL;
 }
 
-/** Returns blob options — passes token explicitly only when available. */
 function blobOpts() {
   const opts = {};
-  if (process.env.BLOB_READ_WRITE_TOKEN) opts.token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    opts.token = process.env.BLOB_READ_WRITE_TOKEN;
+  }
+  if (process.env.BLOB_STORE_ID) {
+    opts.storeId = process.env.BLOB_STORE_ID;
+  }
   return opts;
 }
 
-/**
- * Fetches a JSON blob by its pathname.
- * Uses @vercel/blob's built-in get() with authentication.
- * Automatically handles private vs public store access.
- */
-async function blobRead(pathname) {
-  try {
-    const { get } = await import('@vercel/blob');
-    let res = null;
-    try {
-      res = await get(pathname, {
-        access: blobAccessLevel,
-        useCache: false,
-        ...blobOpts()
-      });
-    } catch (err) {
-      if (err.message && err.message.includes('Cannot use')) {
-        blobAccessLevel = blobAccessLevel === 'private' ? 'public' : 'private';
-        res = await get(pathname, {
-          access: blobAccessLevel,
-          useCache: false,
-          ...blobOpts()
-        });
-      } else {
-        throw err;
-      }
-    }
-    if (!res || !res.stream) return null;
-    const text = await new Response(res.stream).text();
-    if (!text) return null;
-    return JSON.parse(text);
-  } catch (err) {
-    console.warn(`blobRead(${pathname}):`, err.message);
-    return null;
+async function streamToText(stream) {
+  if (!stream) return '';
+  if (typeof stream.text === 'function') {
+    return await stream.text();
   }
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 /**
- * Writes data as a JSON blob.
- * Automatically handles private vs public store access.
+ * Reads a JSON blob from Vercel Blob store.
+ * Returns null if the blob does not exist (404).
+ * Throws on real network or authentication errors.
+ */
+async function blobRead(pathname) {
+  const { get } = await import('@vercel/blob');
+  let res = null;
+  try {
+    res = await get(pathname, {
+      access: 'private',
+      useCache: false,
+      ...blobOpts()
+    });
+  } catch (err) {
+    if (err.message && (err.message.includes('Cannot use "private"') || err.message.includes('access'))) {
+      res = await get(pathname, {
+        access: 'public',
+        useCache: false,
+        ...blobOpts()
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  if (!res || !res.stream) return null; // 404 Not Found returns null
+  const text = await streamToText(res.stream);
+  if (!text || !text.trim()) return null;
+  return JSON.parse(text);
+}
+
+/**
+ * Writes data as a JSON blob to Vercel Blob store.
+ * Always overwrites with exact state and throws on failure.
  */
 async function blobWrite(pathname, data) {
+  const { put } = await import('@vercel/blob');
+  const body = JSON.stringify(data, null, 2);
   try {
-    const { put } = await import('@vercel/blob');
-    const body = JSON.stringify(data);
-    try {
+    await put(pathname, body, {
+      access: 'private',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      ...blobOpts(),
+      contentType: 'application/json'
+    });
+  } catch (err) {
+    if (err.message && (err.message.includes('Cannot use "private"') || err.message.includes('access'))) {
       await put(pathname, body, {
-        access: blobAccessLevel,
+        access: 'public',
         addRandomSuffix: false,
         allowOverwrite: true,
         ...blobOpts(),
         contentType: 'application/json'
       });
-    } catch (err) {
-      if (err.message && err.message.includes('Cannot use')) {
-        blobAccessLevel = blobAccessLevel === 'private' ? 'public' : 'private';
-        await put(pathname, body, {
-          access: blobAccessLevel,
-          addRandomSuffix: false,
-          allowOverwrite: true,
-          ...blobOpts(),
-          contentType: 'application/json'
-        });
-      } else {
-        throw err;
-      }
+    } else {
+      console.error(`blobWrite(${pathname}) failed:`, err.message);
+      throw err;
     }
-  } catch (err) {
-    console.error(`blobWrite(${pathname}) FAILED:`, err.message);
   }
 }
 
-/**
- * Called once per cold start (or on CRUD operation).
- * Loads persisted data into the in-memory arrays.
- * Concurrent requests await the exact same promise so un-hydrated data is never served.
- * If no blob exists yet (first deploy), seeds the blob from current memory.
- */
+let blobInitPromise = null;
 async function ensureBlobInit() {
   if (!usesBlob()) return;
   if (!blobInitPromise) {
     blobInitPromise = (async () => {
       // Products
-      const savedProducts = await blobRead(BLOB_PRODUCTS);
-      if (Array.isArray(savedProducts) && savedProducts.length > 0) {
-        memoryProducts = savedProducts;
-      } else if (savedProducts === null) {
-        await blobWrite(BLOB_PRODUCTS, memoryProducts);
+      try {
+        const savedProducts = await blobRead(BLOB_PRODUCTS);
+        if (Array.isArray(savedProducts)) {
+          memoryProducts = savedProducts;
+        } else if (savedProducts === null) {
+          await blobWrite(BLOB_PRODUCTS, memoryProducts);
+        }
+      } catch (err) {
+        console.warn('ensureBlobInit products error:', err.message);
       }
 
       // Reviews
-      const savedReviews = await blobRead(BLOB_REVIEWS);
-      if (Array.isArray(savedReviews)) {
-        memoryReviews = savedReviews;
-        if (savedReviews.length > 0) {
-          nextReviewId = Math.max(...savedReviews.map((r) => Number(r.id) || 0)) + 1;
+      try {
+        const savedReviews = await blobRead(BLOB_REVIEWS);
+        if (Array.isArray(savedReviews)) {
+          memoryReviews = savedReviews;
+          if (savedReviews.length > 0) {
+            nextReviewId = Math.max(...savedReviews.map((r) => Number(r.id) || 0)) + 1;
+          }
+        } else if (savedReviews === null) {
+          await blobWrite(BLOB_REVIEWS, memoryReviews);
         }
-      } else if (savedReviews === null) {
-        await blobWrite(BLOB_REVIEWS, memoryReviews);
+      } catch (err) {
+        console.warn('ensureBlobInit reviews error:', err.message);
       }
 
-      // Settings (admin password)
-      const savedSettings = await blobRead(BLOB_SETTINGS);
-      if (savedSettings?.adminPassword) {
-        memoryPassword = savedSettings.adminPassword;
-      } else if (savedSettings === null) {
-        await blobWrite(BLOB_SETTINGS, { adminPassword: memoryPassword });
+      // Settings
+      try {
+        const savedSettings = await blobRead(BLOB_SETTINGS);
+        if (savedSettings?.adminPassword) {
+          memoryPassword = savedSettings.adminPassword;
+        } else if (savedSettings === null) {
+          await blobWrite(BLOB_SETTINGS, { adminPassword: memoryPassword });
+        }
+      } catch (err) {
+        console.warn('ensureBlobInit settings error:', err.message);
       }
     })().catch((err) => {
-      console.error('ensureBlobInit failed:', err);
+      console.error('ensureBlobInit promise failed:', err);
       blobInitPromise = null;
     });
   }
   await blobInitPromise;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function initDb() {
-  // No DATABASE_URL → try Vercel Blob, otherwise stay in-memory
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await ensureBlobInit();
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      await db.query(`CREATE TABLE IF NOT EXISTS products (id VARCHAR(80) PRIMARY KEY, sku VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, price INT NOT NULL, old_price INT NOT NULL, discount VARCHAR(40) NOT NULL DEFAULT '', rating DECIMAL(3,1) NOT NULL DEFAULT 0, reviews_count INT NOT NULL DEFAULT 0, image LONGTEXT NOT NULL, image_2 LONGTEXT NULL, image_3 LONGTEXT NULL, image_4 LONGTEXT NULL, category VARCHAR(100) NOT NULL, color VARCHAR(100) NOT NULL DEFAULT '', blades VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(80) NOT NULL DEFAULT '', description TEXT NOT NULL, stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+      try { await db.query("ALTER TABLE products ADD COLUMN stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock'"); } catch {}
+      try { await db.query("ALTER TABLE products MODIFY COLUMN image LONGTEXT NOT NULL"); } catch {}
+      for (const column of ['image_2', 'image_3', 'image_4']) {
+        try { await db.query(`ALTER TABLE products ADD COLUMN ${column} LONGTEXT NULL`); } catch {}
+        try { await db.query(`ALTER TABLE products MODIFY COLUMN ${column} LONGTEXT NULL`); } catch {}
+      }
+      await db.query(`CREATE TABLE IF NOT EXISTS product_reviews (id INT AUTO_INCREMENT PRIMARY KEY, product_id VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, review_date VARCHAR(80) NOT NULL, rating INT NOT NULL, review_text TEXT NOT NULL, seed_key VARCHAR(180) UNIQUE NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(product_id))`);
+      await db.query(`CREATE TABLE IF NOT EXISTS site_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+      await db.query(`INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES ('admin_password', 'maqsood123')`);
+      for (const product of seedProducts) await db.query(`INSERT IGNORE INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [product.id, product.sku, product.name, product.price, product.oldPrice, product.discount, product.rating, product.reviews, product.image, product.image2 || null, product.image3 || null, product.image4 || null, product.category, product.color, product.blades, product.size, product.description, product.stockStatus || 'in_stock']);
+      for (const [productId, reviews] of Object.entries(reviewsByProduct)) for (const [index, review] of reviews.entries()) await db.query(`INSERT IGNORE INTO product_reviews (product_id, name, review_date, rating, review_text, seed_key) VALUES (?, ?, ?, ?, ?, ?)`, [productId, review.name, review.date, review.rating, review.text, `${productId}-seed-${index}`]);
+    } catch (err) {
+      console.warn('Database initialization failed; using in-memory store:', err.message);
+    }
     return;
   }
-  try {
-    const db = await getPool();
-    await db.query(`CREATE TABLE IF NOT EXISTS products (id VARCHAR(80) PRIMARY KEY, sku VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, price INT NOT NULL, old_price INT NOT NULL, discount VARCHAR(40) NOT NULL DEFAULT '', rating DECIMAL(3,1) NOT NULL DEFAULT 0, reviews_count INT NOT NULL DEFAULT 0, image LONGTEXT NOT NULL, image_2 LONGTEXT NULL, image_3 LONGTEXT NULL, image_4 LONGTEXT NULL, category VARCHAR(100) NOT NULL, color VARCHAR(100) NOT NULL DEFAULT '', blades VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(80) NOT NULL DEFAULT '', description TEXT NOT NULL, stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
-    try { await db.query("ALTER TABLE products ADD COLUMN stock_status VARCHAR(30) NOT NULL DEFAULT 'in_stock'"); } catch {}
-    try { await db.query("ALTER TABLE products MODIFY COLUMN image LONGTEXT NOT NULL"); } catch {}
-    for (const column of ['image_2', 'image_3', 'image_4']) {
-      try { await db.query(`ALTER TABLE products ADD COLUMN ${column} LONGTEXT NULL`); } catch {}
-      try { await db.query(`ALTER TABLE products MODIFY COLUMN ${column} LONGTEXT NULL`); } catch {}
-    }
-    await db.query(`CREATE TABLE IF NOT EXISTS product_reviews (id INT AUTO_INCREMENT PRIMARY KEY, product_id VARCHAR(80) NOT NULL, name VARCHAR(160) NOT NULL, review_date VARCHAR(80) NOT NULL, rating INT NOT NULL, review_text TEXT NOT NULL, seed_key VARCHAR(180) UNIQUE NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX(product_id))`);
-    await db.query(`CREATE TABLE IF NOT EXISTS site_settings (setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
-    await db.query(`INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES ('admin_password', 'maqsood123')`);
-    for (const product of seedProducts) await db.query(`INSERT IGNORE INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [product.id, product.sku, product.name, product.price, product.oldPrice, product.discount, product.rating, product.reviews, product.image, product.image2 || null, product.image3 || null, product.image4 || null, product.category, product.color, product.blades, product.size, product.description, product.stockStatus || 'in_stock']);
-    for (const [productId, reviews] of Object.entries(reviewsByProduct)) for (const [index, review] of reviews.entries()) await db.query(`INSERT IGNORE INTO product_reviews (product_id, name, review_date, rating, review_text, seed_key) VALUES (?, ?, ?, ?, ?, ?)`, [productId, review.name, review.date, review.rating, review.text, `${productId}-seed-${index}`]);
-  } catch (err) {
-    console.warn('Database initialization failed; using in-memory store:', err.message);
+
+  if (usesBlob()) {
+    await ensureBlobInit();
   }
 }
 
 export async function getAdminPassword() {
-  if (!process.env.DATABASE_URL) {
-    await ensureBlobInit();
-    return memoryPassword;
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      const [rows] = await db.query("SELECT setting_value FROM site_settings WHERE setting_key = 'admin_password'");
+      return rows.length ? rows[0].setting_value : memoryPassword;
+    } catch {
+      return memoryPassword;
+    }
   }
-  try {
-    const db = await getPool();
-    const [rows] = await db.query("SELECT setting_value FROM site_settings WHERE setting_key = 'admin_password'");
-    return rows.length ? rows[0].setting_value : memoryPassword;
-  } catch {
-    return memoryPassword;
+
+  if (usesBlob()) {
+    try {
+      const settings = await blobRead(BLOB_SETTINGS);
+      if (settings?.adminPassword) {
+        memoryPassword = settings.adminPassword;
+        return settings.adminPassword;
+      }
+    } catch (err) {
+      console.warn('getAdminPassword blob error:', err.message);
+    }
   }
+
+  return memoryPassword;
 }
 
 export async function setAdminPassword(newPassword) {
-  await ensureBlobInit();
   memoryPassword = newPassword;
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await blobWrite(BLOB_SETTINGS, { adminPassword: newPassword });
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      await db.query("INSERT INTO site_settings (setting_key, setting_value) VALUES ('admin_password', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)", [newPassword]);
+    } catch (err) {
+      console.warn('Could not persist admin password to database:', err.message);
+    }
     return;
   }
-  try {
-    const db = await getPool();
-    await db.query("INSERT INTO site_settings (setting_key, setting_value) VALUES ('admin_password', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)", [newPassword]);
-  } catch (err) {
-    console.warn('Could not persist admin password to database:', err.message);
+
+  if (usesBlob()) {
+    try {
+      await blobWrite(BLOB_SETTINGS, { adminPassword: newPassword });
+    } catch (err) {
+      console.error('setAdminPassword blob error:', err.message);
+      throw err;
+    }
   }
 }
 
@@ -291,22 +312,37 @@ export function mapReview(row) {
 }
 
 export async function listProducts() {
-  if (!process.env.DATABASE_URL) {
-    await ensureBlobInit();
-    return memoryProducts;
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      const [rows] = await db.query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products ORDER BY created_at ASC, id ASC');
+      return rows.map(mapProduct);
+    } catch (err) {
+      console.warn('Database query failed, returning in-memory products:', err.message);
+      return memoryProducts;
+    }
   }
-  try {
-    const db = await getPool();
-    const [rows] = await db.query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products ORDER BY created_at ASC, id ASC');
-    return rows.map(mapProduct);
-  } catch (err) {
-    console.warn('Database query failed, returning in-memory products:', err.message);
-    return memoryProducts;
+
+  if (usesBlob()) {
+    try {
+      const blobProducts = await blobRead(BLOB_PRODUCTS);
+      if (Array.isArray(blobProducts)) {
+        memoryProducts = blobProducts;
+        return blobProducts;
+      }
+      if (blobProducts === null) {
+        await blobWrite(BLOB_PRODUCTS, memoryProducts);
+        return memoryProducts;
+      }
+    } catch (err) {
+      console.warn('listProducts blobRead error, falling back to cached memory:', err.message);
+    }
   }
+
+  return memoryProducts;
 }
 
 export async function saveProduct(input, id = input.id) {
-  await ensureBlobInit();
   const formatted = {
     id: id || input.id || `product-${Date.now()}`,
     sku: input.sku || `MF-${Date.now().toString().slice(-4)}`,
@@ -328,88 +364,125 @@ export async function saveProduct(input, id = input.id) {
     stockStatus: input.stockStatus || 'in_stock'
   };
 
-  const existingIdx = memoryProducts.findIndex((p) => p.id === formatted.id);
-  if (existingIdx >= 0) {
-    memoryProducts[existingIdx] = { ...memoryProducts[existingIdx], ...formatted };
-  } else {
-    memoryProducts.push(formatted);
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      const values = [
+        formatted.id, formatted.sku, formatted.name, formatted.price, formatted.oldPrice,
+        formatted.discount, formatted.rating, formatted.reviews, formatted.image,
+        formatted.image2 || null, formatted.image3 || null, formatted.image4 || null,
+        formatted.category, formatted.color, formatted.blades, formatted.size,
+        formatted.description, formatted.stockStatus
+      ];
+      await db.query(
+        `INSERT INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE sku=VALUES(sku), name=VALUES(name), price=VALUES(price), old_price=VALUES(old_price), discount=VALUES(discount), rating=VALUES(rating), reviews_count=VALUES(reviews_count), image=VALUES(image), image_2=VALUES(image_2), image_3=VALUES(image_3), image_4=VALUES(image_4), category=VALUES(category), color=VALUES(color), blades=VALUES(blades), size=VALUES(size), description=VALUES(description), stock_status=VALUES(stock_status)`,
+        values
+      );
+      const [rows] = await db.query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products WHERE id = ?', [formatted.id]);
+      return mapProduct(rows[0]);
+    } catch (err) {
+      console.warn('Database save failed, using memory product:', err.message);
+      return formatted;
+    }
   }
 
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await blobWrite(BLOB_PRODUCTS, memoryProducts);
+  if (usesBlob()) {
+    let currentList = [];
+    try {
+      const fromBlob = await blobRead(BLOB_PRODUCTS);
+      if (Array.isArray(fromBlob)) currentList = fromBlob;
+      else currentList = [...memoryProducts];
+    } catch {
+      currentList = [...memoryProducts];
+    }
+
+    const idx = currentList.findIndex((p) => p.id === formatted.id);
+    if (idx >= 0) {
+      currentList[idx] = { ...currentList[idx], ...formatted };
+    } else {
+      currentList.push(formatted);
+    }
+
+    await blobWrite(BLOB_PRODUCTS, currentList);
+    memoryProducts = currentList;
     return formatted;
   }
-  try {
-    const db = await getPool();
-    const values = [
-      formatted.id,
-      formatted.sku,
-      formatted.name,
-      formatted.price,
-      formatted.oldPrice,
-      formatted.discount,
-      formatted.rating,
-      formatted.reviews,
-      formatted.image,
-      formatted.image2 || null,
-      formatted.image3 || null,
-      formatted.image4 || null,
-      formatted.category,
-      formatted.color,
-      formatted.blades,
-      formatted.size,
-      formatted.description,
-      formatted.stockStatus
-    ];
-    await db.query(
-      `INSERT INTO products (id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE sku=VALUES(sku), name=VALUES(name), price=VALUES(price), old_price=VALUES(old_price), discount=VALUES(discount), rating=VALUES(rating), reviews_count=VALUES(reviews_count), image=VALUES(image), image_2=VALUES(image_2), image_3=VALUES(image_3), image_4=VALUES(image_4), category=VALUES(category), color=VALUES(color), blades=VALUES(blades), size=VALUES(size), description=VALUES(description), stock_status=VALUES(stock_status)`,
-      values
-    );
-    const [rows] = await db.query('SELECT id, sku, name, price, old_price, discount, rating, reviews_count, image, image_2, image_3, image_4, category, color, blades, size, description, stock_status FROM products WHERE id = ?', [formatted.id]);
-    return mapProduct(rows[0]);
-  } catch (err) {
-    console.warn('Database save failed, using memory product:', err.message);
-    return formatted;
-  }
+
+  // Memory fallback
+  const idx = memoryProducts.findIndex((p) => p.id === formatted.id);
+  if (idx >= 0) memoryProducts[idx] = { ...memoryProducts[idx], ...formatted };
+  else memoryProducts.push(formatted);
+  return formatted;
 }
 
 export async function removeProduct(id) {
-  await ensureBlobInit();
-  memoryProducts = memoryProducts.filter((p) => p.id !== id);
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await blobWrite(BLOB_PRODUCTS, memoryProducts);
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      await db.query('DELETE FROM products WHERE id = ?', [id]);
+    } catch (err) {
+      console.warn('Database delete failed, removed from memory:', err.message);
+    }
     return;
   }
-  try {
-    const db = await getPool();
-    await db.query('DELETE FROM products WHERE id = ?', [id]);
-  } catch (err) {
-    console.warn('Database delete failed, removed from memory:', err.message);
+
+  if (usesBlob()) {
+    let currentList = [];
+    try {
+      const fromBlob = await blobRead(BLOB_PRODUCTS);
+      if (Array.isArray(fromBlob)) currentList = fromBlob;
+      else currentList = [...memoryProducts];
+    } catch {
+      currentList = [...memoryProducts];
+    }
+
+    currentList = currentList.filter((p) => p.id !== id);
+
+    await blobWrite(BLOB_PRODUCTS, currentList);
+    memoryProducts = currentList;
+    return;
   }
+
+  memoryProducts = memoryProducts.filter((p) => p.id !== id);
 }
 
 export async function listReviews(productId) {
-  if (!process.env.DATABASE_URL) {
-    await ensureBlobInit();
-    return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      const [rows] = await db.query(
+        productId
+          ? 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE product_id = ? ORDER BY created_at DESC, id DESC'
+          : 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews ORDER BY created_at DESC, id DESC',
+        productId ? [productId] : []
+      );
+      return rows.map(mapReview);
+    } catch (err) {
+      console.warn('Database listReviews failed, returning in-memory reviews:', err.message);
+      return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
+    }
   }
-  try {
-    const db = await getPool();
-    const [rows] = await db.query(
-      productId
-        ? 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE product_id = ? ORDER BY created_at DESC, id DESC'
-        : 'SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews ORDER BY created_at DESC, id DESC',
-      productId ? [productId] : []
-    );
-    return rows.map(mapReview);
-  } catch (err) {
-    console.warn('Database listReviews failed, returning in-memory reviews:', err.message);
-    return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
+
+  if (usesBlob()) {
+    try {
+      const fromBlob = await blobRead(BLOB_REVIEWS);
+      if (Array.isArray(fromBlob)) {
+        memoryReviews = fromBlob;
+        return productId ? fromBlob.filter((r) => r.productId === productId) : fromBlob;
+      }
+      if (fromBlob === null) {
+        await blobWrite(BLOB_REVIEWS, memoryReviews);
+        return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
+      }
+    } catch (err) {
+      console.warn('listReviews blobRead error, falling back to cached memory:', err.message);
+    }
   }
+
+  return productId ? memoryReviews.filter((r) => r.productId === productId) : memoryReviews;
 }
 
 export async function saveReview(input, id = input.id) {
-  await ensureBlobInit();
   const formatted = {
     id: id ? Number(id) : nextReviewId++,
     productId: input.productId,
@@ -419,46 +492,81 @@ export async function saveReview(input, id = input.id) {
     text: input.text || ''
   };
 
-  const existingIdx = memoryReviews.findIndex((r) => r.id === formatted.id);
-  if (existingIdx >= 0) {
-    memoryReviews[existingIdx] = { ...memoryReviews[existingIdx], ...formatted };
-  } else {
-    memoryReviews.unshift(formatted);
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      if (id) {
+        await db.query('UPDATE product_reviews SET product_id=?, name=?, review_date=?, rating=?, review_text=? WHERE id=?', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text, id]);
+      } else {
+        const [result] = await db.query('INSERT INTO product_reviews (product_id, name, review_date, rating, review_text) VALUES (?, ?, ?, ?, ?)', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text]);
+        id = result.insertId;
+        formatted.id = id;
+      }
+      const [rows] = await db.query('SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE id=?', [id]);
+      return mapReview(rows[0]);
+    } catch (err) {
+      console.warn('Database saveReview failed, using memory review:', err.message);
+      return formatted;
+    }
   }
 
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await blobWrite(BLOB_REVIEWS, memoryReviews);
-    return formatted;
-  }
-  try {
-    const db = await getPool();
-    if (id) {
-      await db.query('UPDATE product_reviews SET product_id=?, name=?, review_date=?, rating=?, review_text=? WHERE id=?', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text, id]);
-    } else {
-      const [result] = await db.query('INSERT INTO product_reviews (product_id, name, review_date, rating, review_text) VALUES (?, ?, ?, ?, ?)', [input.productId, input.name, input.date || 'Just now', Number(input.rating), input.text]);
-      id = result.insertId;
-      formatted.id = id;
+  if (usesBlob()) {
+    let currentReviews = [];
+    try {
+      const fromBlob = await blobRead(BLOB_REVIEWS);
+      if (Array.isArray(fromBlob)) currentReviews = fromBlob;
+      else currentReviews = [...memoryReviews];
+    } catch {
+      currentReviews = [...memoryReviews];
     }
-    const [rows] = await db.query('SELECT id, product_id, name, review_date, rating, review_text FROM product_reviews WHERE id=?', [id]);
-    return mapReview(rows[0]);
-  } catch (err) {
-    console.warn('Database saveReview failed, using memory review:', err.message);
+
+    if (!formatted.id || formatted.id >= 1000000000) {
+      const maxId = currentReviews.reduce((max, r) => Math.max(max, Number(r.id) || 0), 0);
+      formatted.id = maxId + 1;
+    }
+
+    const idx = currentReviews.findIndex((r) => r.id === formatted.id);
+    if (idx >= 0) currentReviews[idx] = { ...currentReviews[idx], ...formatted };
+    else currentReviews.unshift(formatted);
+
+    await blobWrite(BLOB_REVIEWS, currentReviews);
+    memoryReviews = currentReviews;
     return formatted;
   }
+
+  const existingIdx = memoryReviews.findIndex((r) => r.id === formatted.id);
+  if (existingIdx >= 0) memoryReviews[existingIdx] = { ...memoryReviews[existingIdx], ...formatted };
+  else memoryReviews.unshift(formatted);
+  return formatted;
 }
 
 export async function removeReview(id) {
-  await ensureBlobInit();
   const numId = Number(id);
-  memoryReviews = memoryReviews.filter((r) => r.id !== numId);
-  if (!process.env.DATABASE_URL) {
-    if (usesBlob()) await blobWrite(BLOB_REVIEWS, memoryReviews);
+  if (process.env.DATABASE_URL) {
+    try {
+      const db = await getPool();
+      await db.query('DELETE FROM product_reviews WHERE id=?', [id]);
+    } catch (err) {
+      console.warn('Database removeReview failed, removed from memory:', err.message);
+    }
     return;
   }
-  try {
-    const db = await getPool();
-    await db.query('DELETE FROM product_reviews WHERE id=?', [id]);
-  } catch (err) {
-    console.warn('Database removeReview failed, removed from memory:', err.message);
+
+  if (usesBlob()) {
+    let currentReviews = [];
+    try {
+      const fromBlob = await blobRead(BLOB_REVIEWS);
+      if (Array.isArray(fromBlob)) currentReviews = fromBlob;
+      else currentReviews = [...memoryReviews];
+    } catch {
+      currentReviews = [...memoryReviews];
+    }
+
+    currentReviews = currentReviews.filter((r) => r.id !== numId);
+    await blobWrite(BLOB_REVIEWS, currentReviews);
+    memoryReviews = currentReviews;
+    return;
   }
+
+  memoryReviews = memoryReviews.filter((r) => r.id !== numId);
 }
