@@ -3,6 +3,7 @@ import { formatPrice, products as seedProducts, reviewsByProduct as seedReviewsB
 const esc = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 
 const DEFAULT_COLORS = ['Ivory', 'Black / Gold', 'Pearl White', 'Walnut', 'Champagne Gold', 'Snow White'];
+const productColors = seedProducts.map((p) => p.color).filter(Boolean);
 const COLOR_STORAGE_KEY = 'maqsood_custom_colors';
 
 function getCustomColors() {
@@ -49,6 +50,10 @@ function getAllColors(currentColor = '') {
   return list;
 }
 
+function slugify(text = '') {
+  return String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 const selectOptions = {
   category: ['Premium', 'Designer', 'Natural', 'Everyday'],
   stockStatus: [['in_stock', 'In stock'], ['out_of_stock', 'Out of stock / Sold out']],
@@ -60,28 +65,28 @@ const selectOptions = {
 };
 
 const productFields = [
-  ['id', 'Slug / ID', 'text', true],
-  ['sku', 'SKU', 'text', true],
   ['name', 'Product name', 'text', true],
   ['price', 'Sale price (Rs.)', 'number', true],
-  ['oldPrice', 'Original price (Rs.)', 'number', true],
-  ['discount', 'Discount label', 'select', false],
-  ['rating', 'Rating', 'select', true],
-  ['reviews', 'Review count', 'number', true],
-  ['image', 'Primary image', 'image', true],
-  ['image2', 'Additional image 2', 'image', false],
-  ['image3', 'Additional image 3', 'image', false],
-  ['image4', 'Additional image 4', 'image', false],
   ['category', 'Category', 'select', true],
   ['stockStatus', 'Availability', 'select', true],
+  ['id', 'Slug / ID (auto-generated if empty)', 'text', false],
+  ['sku', 'SKU (auto-generated if empty)', 'text', false],
+  ['oldPrice', 'Original price (Rs.)', 'number', false],
+  ['discount', 'Discount label', 'select', false],
+  ['rating', 'Rating (default 5.0)', 'select', false],
+  ['reviews', 'Review count', 'number', false],
   ['color', 'Finish / color detail', 'combobox', false],
   ['blades', 'Blade detail', 'select', false],
   ['size', 'Size', 'select', false],
-  ['description', 'Description', 'textarea', true]
+  ['image', 'Primary image', 'image', false],
+  ['image2', 'Additional image 2', 'image', false],
+  ['image3', 'Additional image 3', 'image', false],
+  ['image4', 'Additional image 4', 'image', false],
+  ['description', 'Description', 'textarea', false]
 ];
 
-function inputField([key, label, type, required], product) {
-  if (type === 'textarea') return `<label class="admin-field admin-field-wide">${label}${required ? ' *' : ''}<textarea name="${key}" ${required ? 'required' : ''}>${esc(product[key] || '')}</textarea></label>`;
+function inputField([key, label, type, required], product = {}) {
+  if (type === 'textarea') return `<label class="admin-field admin-field-wide">${label}${required ? ' *' : ''}<textarea name="${key}" id="input-${key}" placeholder="Enter product description or key highlights" ${required ? 'required' : ''}>${esc(product[key] || '')}</textarea></label>`;
   if (key === 'color' || type === 'combobox') {
     const currentVal = String(product[key] || '').trim();
     const colors = getAllColors(currentVal);
@@ -91,25 +96,43 @@ function inputField([key, label, type, required], product) {
     }).join('')}</ul></div></label>`;
   }
   if (type === 'select') {
-    const current = String(product[key] ?? '');
+    const defaultVal = key === 'stockStatus' ? 'in_stock' : (key === 'category' ? 'Everyday' : (key === 'rating' ? '5' : ''));
+    const current = String(product[key] ?? defaultVal);
     const options = [...(selectOptions[key] || [])];
     const values = options.map((option) => String(Array.isArray(option) ? option[0] : option));
     if (current && !values.includes(current)) options.unshift([current, `${current} (current)`]);
-    return `<label class="admin-field">${label}${required ? ' *' : ''}<select name="${key}" ${required ? 'required' : ''}>${options.map((option) => { const value = Array.isArray(option) ? option[0] : option; const text = Array.isArray(option) ? option[1] : option || 'No discount'; return `<option value="${esc(value)}" ${current === String(value) ? 'selected' : ''}>${esc(text)}</option>`; }).join('')}</select></label>`;
+    return `<label class="admin-field">${label}${required ? ' *' : ''}<select name="${key}" id="input-${key}" ${required ? 'required' : ''}>${options.map((option) => { const value = Array.isArray(option) ? option[0] : option; const text = Array.isArray(option) ? option[1] : option || 'None'; return `<option value="${esc(value)}" ${current === String(value) ? 'selected' : ''}>${esc(text)}</option>`; }).join('')}</select></label>`;
   }
   if (type === 'image') {
     const val = esc(product[key] || '');
-    return `<div class="admin-field admin-field-image"><div class="admin-image-top"><span class="admin-image-title">${label}${required ? ' *' : ''}</span><label class="admin-upload-trigger"><input type="file" accept="image/*" class="admin-file-picker" data-target="${key}" /><span>📁 Upload image</span></label></div><div class="admin-image-row"><input name="${key}" id="input-${key}" type="text" value="${val}" placeholder="Upload file or paste URL" ${required ? 'required' : ''}/><div class="admin-img-thumb" id="thumb-${key}">${val ? `<img src="${val}" alt="preview"/>` : '<span>No image</span>'}</div></div></div>`;
+    return `<div class="admin-field admin-field-image"><div class="admin-image-top"><span class="admin-image-title">${label}${required ? ' *' : ''}</span><label class="admin-upload-trigger"><input type="file" accept="image/*" class="admin-file-picker" data-target="${key}" /><span>📁 Upload image</span></label></div><div class="admin-image-row"><input name="${key}" id="input-${key}" type="text" value="${val}" placeholder="Upload file or paste URL (optional)" ${required ? 'required' : ''}/><div class="admin-img-thumb" id="thumb-${key}">${val ? `<img src="${val}" alt="preview"/>` : '<span>No image</span>'}</div></div></div>`;
   }
-  return `<label class="admin-field">${label}${required ? ' *' : ''}<input name="${key}" type="${type}" value="${esc(product[key] ?? '')}" ${required ? 'required' : ''}/></label>`;
+  return `<label class="admin-field">${label}${required ? ' *' : ''}<input name="${key}" id="input-${key}" type="${type}" value="${esc(product[key] ?? '')}" placeholder="${label}" ${required ? 'required' : ''}/></label>`;
 }
 
 function productForm(product = {}) {
-  return `<form class="admin-product-form" id="admin-product-form"><div class="admin-form-grid">${productFields.map((field) => inputField(field, product)).join('')}</div><div class="admin-form-actions"><button type="button" class="button button-light" id="admin-cancel">Cancel</button><button class="button button-dark" type="submit">${product.id ? 'Save changes' : 'Add product'}</button></div></form>`;
+  const isEditing = Boolean(product && product.id);
+  return `<form class="admin-product-form" id="admin-product-form" novalidate>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:12px;">
+      <h3 style="margin:0;font-size:17px;font-weight:700;">${isEditing ? `Edit Product: ${esc(product.name)}` : '+ Add New Product'}</h3>
+      <span style="font-size:11px;color:var(--muted);">${isEditing ? 'ID: ' + esc(product.id) : 'Fill details below and click Add product'}</span>
+    </div>
+    <div class="admin-form-grid">${productFields.map((field) => inputField(field, product)).join('')}</div>
+    <div class="admin-form-actions">
+      <button type="button" class="button button-light" id="admin-cancel">Cancel</button>
+      <button class="button button-dark" type="submit" id="admin-product-submit">${isEditing ? 'Save changes' : 'Add product'}</button>
+    </div>
+  </form>`;
 }
 
 function productTable(products) {
-  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Category</th><th>Availability</th><th>Actions</th></tr></thead><tbody>${products.map(p => `<tr><td><div class="admin-product-cell"><img src="${esc(p.image)}" alt=""/><span><b>${esc(p.name)}</b><small>${esc(p.id)}</small></span></div></td><td>${esc(p.sku)}</td><td>${formatPrice(p.price)}</td><td>${esc(p.category)}</td><td><span class="admin-stock ${p.stockStatus === 'out_of_stock' ? 'out' : 'in'}">${p.stockStatus === 'out_of_stock' ? 'Sold out' : 'In stock'}</span></td><td><button class="admin-edit" data-edit-product="${esc(p.id)}">Edit</button><button class="admin-delete" data-delete-product="${esc(p.id)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
+  if (!products || !products.length) {
+    return `<div class="admin-empty-table" style="padding:40px 20px;text-align:center;background:#fff;border:1px solid var(--line);margin-bottom:20px;">
+      <p style="color:var(--muted);margin:0 0 14px;font-size:13px;">No products in the catalogue yet.</p>
+      <button type="button" class="button button-gold" id="admin-add-empty">+ Add your first product</button>
+    </div>`;
+  }
+  return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Category</th><th>Availability</th><th>Actions</th></tr></thead><tbody>${products.map(p => `<tr><td><div class="admin-product-cell"><img src="${esc(p.image || '/assets/hero-clean.jpg')}" alt=""/><span><b>${esc(p.name)}</b><small>${esc(p.id)}</small></span></div></td><td>${esc(p.sku || '')}</td><td>${formatPrice(p.price)}</td><td>${esc(p.category || 'Everyday')}</td><td><span class="admin-stock ${p.stockStatus === 'out_of_stock' ? 'out' : 'in'}">${p.stockStatus === 'out_of_stock' ? 'Sold out' : 'In stock'}</span></td><td><button type="button" class="admin-edit" data-edit-product="${esc(p.id)}">Edit</button><button type="button" class="admin-delete" data-delete-product="${esc(p.id)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function reviewForm(review = {}, products = []) {
@@ -276,11 +299,14 @@ async function renderAdminWorkspace(root) {
   document.querySelector('#admin-change-pass-tb')?.addEventListener('click', openPasswordModal);
 
   const editor = root.querySelector('#admin-editor');
-  root.querySelector('#admin-add').addEventListener('click', () => {
+  const openNewProductForm = () => {
     editor.innerHTML = productForm();
     bindProductForm(root, null);
     editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+    editor.querySelector('#input-name')?.focus();
+  };
+  root.querySelector('#admin-add')?.addEventListener('click', openNewProductForm);
+  root.querySelector('#admin-add-empty')?.addEventListener('click', openNewProductForm);
 
   root.querySelectorAll('[data-edit-product]').forEach(b => b.addEventListener('click', () => {
     editor.innerHTML = productForm(products.find(p => p.id === b.dataset.editProduct));
@@ -487,6 +513,29 @@ function bindProductForm(root, editingId) {
     root.querySelector('#admin-editor').innerHTML = '';
   });
 
+  if (!editingId) {
+    const nameInput = root.querySelector('#input-name');
+    const idInput = root.querySelector('#input-id');
+    const skuInput = root.querySelector('#input-sku');
+    let lastAutoSlug = '';
+    let lastAutoSku = '';
+
+    nameInput?.addEventListener('input', () => {
+      const currentName = nameInput.value.trim();
+      const generatedSlug = slugify(currentName);
+      if (idInput && (!idInput.value || idInput.value === lastAutoSlug)) {
+        idInput.value = generatedSlug;
+        lastAutoSlug = generatedSlug;
+      }
+      if (skuInput && (!skuInput.value || skuInput.value === lastAutoSku)) {
+        const hash = Math.abs(currentName.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0) % 9000 + 1000);
+        const generatedSku = currentName ? `MF-${hash}` : '';
+        skuInput.value = generatedSku;
+        lastAutoSku = generatedSku;
+      }
+    });
+  }
+
   root.querySelectorAll('.admin-file-picker').forEach(picker => {
     picker.addEventListener('change', e => {
       const file = e.target.files?.[0];
@@ -499,7 +548,7 @@ function bindProductForm(root, editingId) {
       reader.onload = evt => {
         const img = new Image();
         img.onload = () => {
-          const maxDim = 1200;
+          const maxDim = 800;
           let w = img.width, h = img.height;
           if (w > maxDim || h > maxDim) {
             if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
@@ -509,7 +558,7 @@ function bindProductForm(root, editingId) {
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
           if (input) input.value = dataUrl;
           if (thumb) thumb.innerHTML = `<img src="${dataUrl}" alt="preview"/>`;
         };
@@ -533,18 +582,52 @@ function bindProductForm(root, editingId) {
   const productFormEl = root.querySelector('#admin-product-form');
   productFormEl.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const submitBtn = productFormEl.querySelector('button[type="submit"]');
-    const originalText = submitBtn ? submitBtn.textContent : 'Save';
+
+    const data = Object.fromEntries(new FormData(productFormEl).entries());
+    const name = String(data.name || '').trim();
+    if (!name) {
+      showAdminToast('Please enter a product name.', 'error');
+      productFormEl.querySelector('#input-name')?.focus();
+      return;
+    }
+
+    const price = Number(data.price || 0);
+    if (!price || price <= 0) {
+      showAdminToast('Please enter a valid price greater than 0.', 'error');
+      productFormEl.querySelector('#input-price')?.focus();
+      return;
+    }
+
+    data.name = name;
+    data.price = price;
+    data.id = String(data.id || '').trim() || slugify(name) || `product-${Date.now()}`;
+    data.sku = String(data.sku || '').trim() || `MF-${Date.now().toString().slice(-4)}`;
+    data.oldPrice = Number(data.oldPrice) || price;
+    data.discount = String(data.discount || '').trim();
+    data.rating = Number(data.rating) || 5;
+    data.reviews = Number(data.reviews) || 0;
+    data.category = String(data.category || 'Everyday').trim();
+    data.stockStatus = String(data.stockStatus || 'in_stock').trim();
+    data.image = String(data.image || '').trim() || '/assets/hero-clean.jpg';
+    data.image2 = String(data.image2 || '').trim();
+    data.image3 = String(data.image3 || '').trim();
+    data.image4 = String(data.image4 || '').trim();
+    data.color = String(data.color || '').trim();
+    data.blades = String(data.blades || '3 blade').trim();
+    data.size = String(data.size || '48 inch').trim();
+    data.description = String(data.description || `${name} by Maqsood Fans with pure copper motor.`).trim();
+
+    if (data.color) {
+      saveCustomColor(data.color);
+    }
+
+    const submitBtn = productFormEl.querySelector('#admin-product-submit');
+    const originalText = submitBtn ? submitBtn.textContent : (editingId ? 'Save changes' : 'Add product');
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving to database…';
     }
 
-    const data = Object.fromEntries(new FormData(productFormEl).entries());
-    ['price', 'oldPrice', 'rating', 'reviews'].forEach(k => data[k] = Number(data[k] || 0));
-    if (data.color) {
-      saveCustomColor(data.color);
-    }
     const targetUrl = editingId ? `/api/admin/products/${encodeURIComponent(editingId)}` : '/api/admin/products';
     const method = editingId ? 'PUT' : 'POST';
 

@@ -158,6 +158,42 @@ async function blobWrite(pathname, data) {
   }
 }
 
+function getSeedProductList() {
+  return seedProducts.map((p) => ({
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    price: Number(p.price),
+    oldPrice: Number(p.oldPrice || p.price),
+    discount: p.discount || '',
+    rating: Number(p.rating || 5),
+    reviews: Number(p.reviews || 0),
+    image: p.image || '/assets/hero-clean.jpg',
+    image2: p.image2 || '',
+    image3: p.image3 || '',
+    image4: p.image4 || '',
+    category: p.category || 'Everyday',
+    color: p.color || '',
+    blades: p.blades || '3 blade',
+    size: p.size || '48 inch',
+    description: p.description || '',
+    stockStatus: p.stockStatus || 'in_stock'
+  }));
+}
+
+function mergeWithSeeds(existingList) {
+  const seeds = getSeedProductList();
+  if (!Array.isArray(existingList) || existingList.length === 0) {
+    return seeds;
+  }
+  const existingIds = new Set(existingList.map((p) => p.id));
+  const missingSeeds = seeds.filter((s) => !existingIds.has(s.id));
+  if (missingSeeds.length > 0 && existingList.length < seeds.length) {
+    return [...seeds, ...existingList.filter((p) => !seeds.some((s) => s.id === p.id))];
+  }
+  return existingList;
+}
+
 let blobInitPromise = null;
 async function ensureBlobInit() {
   if (!usesBlob()) return;
@@ -166,10 +202,10 @@ async function ensureBlobInit() {
       // Products
       try {
         const savedProducts = await blobRead(BLOB_PRODUCTS);
-        if (Array.isArray(savedProducts)) {
-          memoryProducts = savedProducts;
-        } else if (savedProducts === null) {
-          await blobWrite(BLOB_PRODUCTS, memoryProducts);
+        const resolved = mergeWithSeeds(savedProducts);
+        memoryProducts = resolved;
+        if (!savedProducts || savedProducts.length !== resolved.length) {
+          await blobWrite(BLOB_PRODUCTS, resolved);
         }
       } catch (err) {
         console.warn('ensureBlobInit products error:', err.message);
@@ -326,14 +362,12 @@ export async function listProducts() {
   if (usesBlob()) {
     try {
       const blobProducts = await blobRead(BLOB_PRODUCTS);
-      if (Array.isArray(blobProducts)) {
-        memoryProducts = blobProducts;
-        return blobProducts;
+      const resolved = mergeWithSeeds(blobProducts);
+      memoryProducts = resolved;
+      if (!blobProducts || blobProducts.length !== resolved.length) {
+        await blobWrite(BLOB_PRODUCTS, resolved);
       }
-      if (blobProducts === null) {
-        await blobWrite(BLOB_PRODUCTS, memoryProducts);
-        return memoryProducts;
-      }
+      return resolved;
     } catch (err) {
       console.warn('listProducts blobRead error, falling back to cached memory:', err.message);
     }
@@ -343,25 +377,32 @@ export async function listProducts() {
 }
 
 export async function saveProduct(input, id = input.id) {
+  const cleanName = String(input.name || '').trim();
+  const rawId = String(id || input.id || '').trim();
+  const generatedId = rawId || cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `product-${Date.now()}`;
+  const generatedSku = String(input.sku || '').trim() || `MF-${Date.now().toString().slice(-4)}`;
+  const price = Math.max(0, Number(input.price || 0));
+  const oldPrice = input.oldPrice ? Number(input.oldPrice) : price;
+
   const formatted = {
-    id: id || input.id || `product-${Date.now()}`,
-    sku: input.sku || `MF-${Date.now().toString().slice(-4)}`,
-    name: input.name || 'Untitled Fan',
-    price: Number(input.price || 0),
-    oldPrice: Number(input.oldPrice || input.price || 0),
-    discount: input.discount || '',
+    id: generatedId,
+    sku: generatedSku,
+    name: cleanName || 'Untitled Fan',
+    price,
+    oldPrice,
+    discount: String(input.discount || '').trim(),
     rating: Number(input.rating || 5),
     reviews: Number(input.reviews || 0),
-    image: input.image || '',
-    image2: input.image2 || '',
-    image3: input.image3 || '',
-    image4: input.image4 || '',
-    category: input.category || 'Everyday',
-    color: input.color || '',
-    blades: input.blades || '',
-    size: input.size || '',
-    description: input.description || '',
-    stockStatus: input.stockStatus || 'in_stock'
+    image: String(input.image || '').trim() || '/assets/hero-clean.jpg',
+    image2: String(input.image2 || '').trim(),
+    image3: String(input.image3 || '').trim(),
+    image4: String(input.image4 || '').trim(),
+    category: String(input.category || 'Everyday').trim(),
+    color: String(input.color || '').trim(),
+    blades: String(input.blades || '3 blade').trim(),
+    size: String(input.size || '48 inch').trim(),
+    description: String(input.description || `${cleanName || 'Premium ceiling fan'} by Maqsood Fans with pure copper motor.`).trim(),
+    stockStatus: String(input.stockStatus || 'in_stock').trim()
   };
 
   if (process.env.DATABASE_URL) {
@@ -390,8 +431,7 @@ export async function saveProduct(input, id = input.id) {
     let currentList = [];
     try {
       const fromBlob = await blobRead(BLOB_PRODUCTS);
-      if (Array.isArray(fromBlob)) currentList = fromBlob;
-      else currentList = [...memoryProducts];
+      currentList = mergeWithSeeds(fromBlob);
     } catch {
       currentList = [...memoryProducts];
     }
@@ -430,8 +470,7 @@ export async function removeProduct(id) {
     let currentList = [];
     try {
       const fromBlob = await blobRead(BLOB_PRODUCTS);
-      if (Array.isArray(fromBlob)) currentList = fromBlob;
-      else currentList = [...memoryProducts];
+      currentList = Array.isArray(fromBlob) ? fromBlob : [...memoryProducts];
     } catch {
       currentList = [...memoryProducts];
     }
