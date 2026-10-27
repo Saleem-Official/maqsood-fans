@@ -97,7 +97,8 @@ const whatsappUrl = (message) => `https://wa.me/${DEMO_WHATSAPP_NUMBER}?text=${e
 const genericWhatsAppMessage = 'Assalam-o-Alaikum Maqsood Fans, I would like to know more about your ceiling fans.';
 
 function cartWhatsAppMessage() {
-  const items = state.cart.length ? state.cart : [{ product: products[1], qty: 1 }];
+  const fallbackProduct = products[0] || { name: 'Ceiling Fan', sku: 'MF-0000', price: 0 };
+  const items = state.cart.length ? state.cart : [{ product: fallbackProduct, qty: 1 }];
   const lines = items.map(({ product, qty }) => `- ${product.name} (${product.sku}) x ${qty} — ${formatPrice(product.price * qty)}`).join('\n');
   const total = items.reduce((sum, item) => sum + item.product.price * item.qty, 0);
   return `Assalam-o-Alaikum Maqsood Fans,\n\nI would like to order:\n${lines}\n\nEstimated total: ${formatPrice(total)}\n\nPlease confirm availability and delivery details.`;
@@ -195,10 +196,11 @@ function cartPage() {
 
 function checkoutPage() {
   const total = state.cart.reduce((sum, item) => sum + item.product.price * item.qty, 0);
-  const items = state.cart.length ? state.cart : [{ product: products[1], qty: 1 }];
+  const fallbackProduct = products[0] || { name: 'Ceiling Fan', sku: 'MF-0000', price: 0, image: '/assets/hero-clean.jpg' };
+  const items = state.cart.length ? state.cart : (products.length ? [{ product: fallbackProduct, qty: 1 }] : []);
   const currentCity = getSavedCity();
   const suggestions = getCitySuggestions();
-  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><a href="/cart" data-link>Cart</a><span>/</span><span>Checkout</span></div><span class="eyebrow">DIRECT ORDERING</span><h1>Almost home.</h1><p>Fill in your details and our team will confirm everything on WhatsApp.</p></div></div><section class="content-section checkout-section"><div class="content-wrap checkout-layout"><form class="checkout-form" id="checkout-form"><div class="form-card"><span class="eyebrow">CUSTOMER INFORMATION</span><h2>Where should we reach you?</h2><div class="form-grid"><label>Full Name *<input name="fullName" required placeholder="Enter your full name" /></label><label>WhatsApp Number *<input name="phone" required placeholder="03XX XXXXXXX" /></label><label class="city-field-label">City *<div class="combobox-wrap" id="city-combobox"><input name="city" id="checkout-city" class="combobox-input" required placeholder="Select or type city (e.g. Lahore)" value="${currentCity}" autocomplete="off" aria-autocomplete="list" aria-expanded="false" /><button type="button" class="combobox-toggle" aria-label="Toggle city options" tabindex="-1">${icon('chevron', 14)}</button><ul class="combobox-dropdown" id="city-dropdown" role="listbox" hidden>${suggestions.map((city) => `<li class="combobox-item ${city.toLowerCase() === currentCity.toLowerCase() ? 'is-selected' : ''}" data-value="${city}" role="option"><span>${city}</span>${city.toLowerCase() === 'lahore' ? '<small>Free Same-Day Delivery</small>' : ''}</li>`).join('')}</ul></div></label><label class="full-field">Complete Delivery Address *<textarea name="address" required placeholder="House no, street, area"></textarea></label><label class="full-field">Order Notes <textarea name="notes" placeholder="Any special instructions (optional)"></textarea></label></div></div><button class="button button-dark full submit-demo" type="submit">${icon('whatsapp', 17)} Place Order on WhatsApp</button><p class="form-note">This is a frontend demo. No account, payment method, or real order will be created.</p></form><aside class="summary-card checkout-summary"><span class="eyebrow">ORDER SUMMARY</span><h2>Your selected fans</h2>${items.map((item) => `<div class="mini-product"><img src="${item.product.image}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} × ${item.qty}</small></div><strong>${formatPrice(item.product.price * item.qty)}</strong></div>`).join('')}<div class="summary-total"><span>Total amount</span><b>${formatPrice(total || items[0].product.price)}</b></div><div class="secure-note">${icon('shield', 17)} <span>Secure by design. Payment is not enabled on this showcase.</span></div></aside></div></section></main>${footer()}`;
+  return `${header()}<main><div class="page-hero small"><div class="content-wrap"><div class="breadcrumbs"><a href="/" data-link>Home</a><span>/</span><a href="/cart" data-link>Cart</a><span>/</span><span>Checkout</span></div><span class="eyebrow">DIRECT ORDERING</span><h1>Almost home.</h1><p>Fill in your details and our team will confirm everything on WhatsApp.</p></div></div><section class="content-section checkout-section"><div class="content-wrap checkout-layout"><form class="checkout-form" id="checkout-form"><div class="form-card"><span class="eyebrow">CUSTOMER INFORMATION</span><h2>Where should we reach you?</h2><div class="form-grid"><label>Full Name *<input name="fullName" required placeholder="Enter your full name" /></label><label>WhatsApp Number *<input name="phone" required placeholder="03XX XXXXXXX" /></label><label class="city-field-label">City *<div class="combobox-wrap" id="city-combobox"><input name="city" id="checkout-city" class="combobox-input" required placeholder="Select or type city (e.g. Lahore)" value="${currentCity}" autocomplete="off" aria-autocomplete="list" aria-expanded="false" /><button type="button" class="combobox-toggle" aria-label="Toggle city options" tabindex="-1">${icon('chevron', 14)}</button><ul class="combobox-dropdown" id="city-dropdown" role="listbox" hidden>${suggestions.map((city) => `<li class="combobox-item ${city.toLowerCase() === currentCity.toLowerCase() ? 'is-selected' : ''}" data-value="${city}" role="option"><span>${city}</span>${city.toLowerCase() === 'lahore' ? '<small>Free Same-Day Delivery</small>' : ''}</li>`).join('')}</ul></div></label><label class="full-field">Complete Delivery Address *<textarea name="address" required placeholder="House no, street, area"></textarea></label><label class="full-field">Order Notes <textarea name="notes" placeholder="Any special instructions (optional)"></textarea></label></div></div><button class="button button-dark full submit-demo" type="submit">${icon('whatsapp', 17)} Place Order on WhatsApp</button><p class="form-note">This is a frontend demo. No account, payment method, or real order will be created.</p></form><aside class="summary-card checkout-summary"><span class="eyebrow">ORDER SUMMARY</span><h2>Your selected fans</h2>${items.length ? items.map((item) => `<div class="mini-product"><img src="${item.product.image || '/assets/hero-clean.jpg'}" alt="${item.product.name}" /><div><b>${item.product.name}</b><small>${item.product.sku} × ${item.qty}</small></div><strong>${formatPrice(item.product.price * item.qty)}</strong></div>`).join('') : '<p style="color:var(--muted);font-size:13px;padding:12px 0;">No products selected.</p>'}<div class="summary-total"><span>Total amount</span><b>${formatPrice(total || (items[0] && items[0].product ? items[0].product.price : 0))}</b></div><div class="secure-note">${icon('shield', 17)} <span>Secure by design. Payment is not enabled on this showcase.</span></div></aside></div></section></main>${footer()}`;
 }
 
 function mobileBottomNav() {
@@ -532,7 +534,8 @@ function bindCityCombobox() {
       return;
     }
     saveCustomCity(city);
-    const items = state.cart.length ? state.cart : [{ product: products[1], qty: 1 }];
+    const fallbackProduct = products[0] || { name: 'Ceiling Fan', sku: 'MF-0000', price: 0 };
+    const items = state.cart.length ? state.cart : (products.length ? [{ product: fallbackProduct, qty: 1 }] : []);
     const lines = items.map(({ product, qty }) => `- ${product.name} (${product.sku}) x ${qty} — ${formatPrice(product.price * qty)}`).join('\n');
     const total = items.reduce((sum, item) => sum + item.product.price * item.qty, 0);
     const message = `Assalam-o-Alaikum Maqsood Fans,\n\nI would like to place an order.\n\nProducts:\n${lines}\n\nCustomer details:\nName: ${details.fullName}\nWhatsApp: ${details.phone}\nCity: ${city}\nAddress: ${details.address}${details.notes ? `\nNotes: ${details.notes}` : ''}\n\nEstimated total: ${formatPrice(total)}\n\nPlease confirm availability and delivery timing.`;
@@ -549,12 +552,12 @@ async function hydrateCatalog() {
     const response = await fetch(`/api/products?_t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) return;
     const remoteProducts = await response.json();
-    if (remoteProducts.length) {
+    if (Array.isArray(remoteProducts)) {
       products.splice(0, products.length, ...remoteProducts);
       state.cart = state.cart.map((item) => {
         const fresh = findProduct(item.product.id) || item.product;
         return { product: fresh, qty: item.qty };
-      });
+      }).filter(item => item && item.product && item.product.id);
       saveCartToStorage();
       const reviewsResponse = await fetch(`/api/reviews?_t=${Date.now()}`, { cache: 'no-store' });
       if (reviewsResponse.ok) {

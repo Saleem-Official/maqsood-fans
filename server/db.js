@@ -111,11 +111,20 @@ async function blobRead(pathname) {
     });
   } catch (err) {
     if (err.message && (err.message.includes('Cannot use "private"') || err.message.includes('access'))) {
-      res = await get(pathname, {
-        access: 'public',
-        useCache: false,
-        ...blobOpts()
-      });
+      try {
+        res = await get(pathname, {
+          access: 'public',
+          useCache: false,
+          ...blobOpts()
+        });
+      } catch (err2) {
+        if (err2.name === 'BlobNotFoundError' || err2.status === 404 || err2.statusCode === 404 || (err2.message && (err2.message.includes('could not find') || err2.message.includes('not found') || err2.message.includes('404')))) {
+          return null;
+        }
+        throw err2;
+      }
+    } else if (err.name === 'BlobNotFoundError' || err.status === 404 || err.statusCode === 404 || (err.message && (err.message.includes('could not find') || err.message.includes('not found') || err.message.includes('404')))) {
+      return null;
     } else {
       throw err;
     }
@@ -158,7 +167,7 @@ async function blobWrite(pathname, data) {
   }
 }
 
-function getSeedProductList() {
+export function getSeedProductList() {
   return seedProducts.map((p) => ({
     id: p.id,
     sku: p.sku,
@@ -181,17 +190,13 @@ function getSeedProductList() {
   }));
 }
 
-function mergeWithSeeds(existingList) {
+export async function resetProductsToSeeds() {
   const seeds = getSeedProductList();
-  if (!Array.isArray(existingList) || existingList.length === 0) {
-    return seeds;
+  if (usesBlob()) {
+    await blobWrite(BLOB_PRODUCTS, seeds);
   }
-  const existingIds = new Set(existingList.map((p) => p.id));
-  const missingSeeds = seeds.filter((s) => !existingIds.has(s.id));
-  if (missingSeeds.length > 0 && existingList.length < seeds.length) {
-    return [...seeds, ...existingList.filter((p) => !seeds.some((s) => s.id === p.id))];
-  }
-  return existingList;
+  memoryProducts = seeds;
+  return seeds;
 }
 
 let blobInitPromise = null;
@@ -199,13 +204,15 @@ async function ensureBlobInit() {
   if (!usesBlob()) return;
   if (!blobInitPromise) {
     blobInitPromise = (async () => {
-      // Products
+      // Products: only seed if products blob does not exist at all in storage
       try {
         const savedProducts = await blobRead(BLOB_PRODUCTS);
-        const resolved = mergeWithSeeds(savedProducts);
-        memoryProducts = resolved;
-        if (!savedProducts || savedProducts.length !== resolved.length) {
-          await blobWrite(BLOB_PRODUCTS, resolved);
+        if (Array.isArray(savedProducts)) {
+          memoryProducts = savedProducts;
+        } else if (savedProducts === null) {
+          const initial = getSeedProductList();
+          await blobWrite(BLOB_PRODUCTS, initial);
+          memoryProducts = initial;
         }
       } catch (err) {
         console.warn('ensureBlobInit products error:', err.message);
@@ -362,12 +369,16 @@ export async function listProducts() {
   if (usesBlob()) {
     try {
       const blobProducts = await blobRead(BLOB_PRODUCTS);
-      const resolved = mergeWithSeeds(blobProducts);
-      memoryProducts = resolved;
-      if (!blobProducts || blobProducts.length !== resolved.length) {
-        await blobWrite(BLOB_PRODUCTS, resolved);
+      if (Array.isArray(blobProducts)) {
+        memoryProducts = blobProducts;
+        return blobProducts;
       }
-      return resolved;
+      if (blobProducts === null) {
+        const initial = getSeedProductList();
+        await blobWrite(BLOB_PRODUCTS, initial);
+        memoryProducts = initial;
+        return initial;
+      }
     } catch (err) {
       console.warn('listProducts blobRead error, falling back to cached memory:', err.message);
     }
@@ -431,7 +442,13 @@ export async function saveProduct(input, id = input.id) {
     let currentList = [];
     try {
       const fromBlob = await blobRead(BLOB_PRODUCTS);
-      currentList = mergeWithSeeds(fromBlob);
+      if (Array.isArray(fromBlob)) {
+        currentList = fromBlob;
+      } else if (fromBlob === null) {
+        currentList = getSeedProductList();
+      } else {
+        currentList = [...memoryProducts];
+      }
     } catch {
       currentList = [...memoryProducts];
     }
@@ -470,7 +487,13 @@ export async function removeProduct(id) {
     let currentList = [];
     try {
       const fromBlob = await blobRead(BLOB_PRODUCTS);
-      currentList = Array.isArray(fromBlob) ? fromBlob : [...memoryProducts];
+      if (Array.isArray(fromBlob)) {
+        currentList = fromBlob;
+      } else if (fromBlob === null) {
+        currentList = getSeedProductList();
+      } else {
+        currentList = [...memoryProducts];
+      }
     } catch {
       currentList = [...memoryProducts];
     }

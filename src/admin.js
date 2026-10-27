@@ -129,7 +129,10 @@ function productTable(products) {
   if (!products || !products.length) {
     return `<div class="admin-empty-table" style="padding:40px 20px;text-align:center;background:#fff;border:1px solid var(--line);margin-bottom:20px;">
       <p style="color:var(--muted);margin:0 0 14px;font-size:13px;">No products in the catalogue yet.</p>
-      <button type="button" class="button button-gold" id="admin-add-empty">+ Add your first product</button>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button type="button" class="button button-gold" id="admin-add-empty">+ Add your first product</button>
+        <button type="button" class="button button-light" id="admin-restore-empty">↺ Restore default products</button>
+      </div>
     </div>`;
   }
   return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Product</th><th>SKU</th><th>Price</th><th>Category</th><th>Availability</th><th>Actions</th></tr></thead><tbody>${products.map(p => `<tr><td><div class="admin-product-cell"><img src="${esc(p.image || '/assets/hero-clean.jpg')}" alt=""/><span><b>${esc(p.name)}</b><small>${esc(p.id)}</small></span></div></td><td>${esc(p.sku || '')}</td><td>${formatPrice(p.price)}</td><td>${esc(p.category || 'Everyday')}</td><td><span class="admin-stock ${p.stockStatus === 'out_of_stock' ? 'out' : 'in'}">${p.stockStatus === 'out_of_stock' ? 'Sold out' : 'In stock'}</span></td><td><button type="button" class="admin-edit" data-edit-product="${esc(p.id)}">Edit</button><button type="button" class="admin-delete" data-delete-product="${esc(p.id)}">Delete</button></td></tr>`).join('')}</tbody></table></div>`;
@@ -307,6 +310,17 @@ async function renderAdminWorkspace(root) {
   };
   root.querySelector('#admin-add')?.addEventListener('click', openNewProductForm);
   root.querySelector('#admin-add-empty')?.addEventListener('click', openNewProductForm);
+  root.querySelector('#admin-restore-empty')?.addEventListener('click', async () => {
+    if (!confirm('Restore default products to the catalogue?')) return;
+    try {
+      const res = await fetch('/api/admin/products/reset', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to restore default products');
+      showAdminToast('Default products restored successfully!', 'success');
+      await renderAdminWorkspace(root);
+    } catch (err) {
+      showAdminToast(err.message, 'error');
+    }
+  });
 
   root.querySelectorAll('[data-edit-product]').forEach(b => b.addEventListener('click', () => {
     editor.innerHTML = productForm(products.find(p => p.id === b.dataset.editProduct));
