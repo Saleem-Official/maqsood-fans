@@ -281,6 +281,9 @@ async function renderAdminWorkspace(root) {
     ]);
     if (productsResponse.ok) {
       products = await productsResponse.json();
+      try {
+        localStorage.setItem('maqsood_catalog_cache', JSON.stringify(products));
+      } catch {}
     } else {
       const err = await productsResponse.json().catch(() => ({}));
       fetchError = err.error || `HTTP ${productsResponse.status} loading products`;

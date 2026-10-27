@@ -1,4 +1,4 @@
-export const products = [
+export const seedProducts = [
   {
     id: 'royal-plus', name: 'Royal Plus', sku: 'MF-1001', price: 8400, oldPrice: 12000, discount: '30% OFF', rating: 4.9, reviews: 24,
     image: '/assets/royal-plus.jpg', category: 'Premium', color: 'Ivory', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'The Royal Plus by Maqsood Fans features a graceful ivory finish with an energy-efficient pure copper motor made for modern Pakistani living rooms. Delivers quiet, powerful airflow, low wattage consumption, and reliable everyday cooling.'
@@ -37,14 +37,31 @@ export const products = [
   }
 ];
 
+const CACHE_KEY = 'maqsood_catalog_cache';
+function loadCachedProducts() {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+const initialCached = loadCachedProducts();
+export const products = initialCached !== null ? [...initialCached] : [];
+
 export const categories = [
   { name: 'Premium Collection', count: '04 models', image: '/assets/classic-detail.jpg', tone: 'dark' },
   { name: 'Natural Wood', count: '03 models', image: '/assets/wooden-touch.jpg', tone: 'warm' },
   { name: 'Everyday Comfort', count: '06 models', image: '/assets/royal-plus.jpg', tone: 'light' }
 ];
 
-export const formatPrice = (number) => `Rs. ${number.toLocaleString('en-IN')}`;
-export const findProduct = (id) => products.find((product) => product.id === id) || products[0];
+export const formatPrice = (number) => `Rs. ${Number(number || 0).toLocaleString('en-IN')}`;
+export const findProduct = (id) => products.find((product) => product.id === id) || null;
 
 
 export const reviewsByProduct = {
