@@ -1,4 +1,4 @@
-import { products as seedProducts, reviewsByProduct } from '../src/data.js';
+import { seedProducts, reviewsByProduct } from '../src/data.js';
 
 let pool = null;
 let mysql = null;

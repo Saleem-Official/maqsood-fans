@@ -1,39 +1,30 @@
 export const seedProducts = [
   {
-    id: 'royal-plus', name: 'Royal Plus', sku: 'MF-1001', price: 8400, oldPrice: 12000, discount: '30% OFF', rating: 4.9, reviews: 24,
-    image: '/assets/royal-plus.jpg', category: 'Premium', color: 'Ivory', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'The Royal Plus by Maqsood Fans features a graceful ivory finish with an energy-efficient pure copper motor made for modern Pakistani living rooms. Delivers quiet, powerful airflow, low wattage consumption, and reliable everyday cooling.'
+    id: 'lahore-model', name: 'Lahore Model', sku: 'MF-204', price: 10500, oldPrice: 12075, discount: '15% OFF', rating: 5, reviews: 0,
+    image: 'https://images.unsplash.com/photo-1565538810643-b5bdb714032a?auto=format&fit=crop&w=1200&q=80',
+    image2: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+    image3: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80',
+    image4: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
+    category: 'Premium', color: 'Ivory / Gold', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock',
+    description: 'Lahore Model by Maqsood Fans — a premium ceiling fan with elegant ivory and gold finish, pure copper motor, and powerful silent airflow for drawing rooms and lounges across Pakistan.'
   },
   {
-    id: 'classic-pro', name: 'Classic Pro', sku: 'MF-1002', price: 8800, oldPrice: 11000, discount: '20% OFF', rating: 4.8, reviews: 18,
-    image: '/assets/classic-detail.jpg', category: 'Premium', color: 'Black / Gold', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bold black-and-gold designer ceiling fan by Maqsood Fans with high air delivery and modern aesthetic appeal. Features a heavy-duty copper motor, smooth 3-blade balance, and dependable operation for lounges and living rooms.'
+    id: 'king-model', name: 'King-Model', sku: 'MF-202', price: 8400, oldPrice: 9660, discount: '15% OFF', rating: 5, reviews: 10,
+    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+    image2: 'https://images.unsplash.com/photo-1565538810643-b5bdb714032a?auto=format&fit=crop&w=1200&q=80',
+    image3: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
+    image4: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80',
+    category: 'Designer', color: 'Brown / White', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock',
+    description: 'King-Model by Maqsood Fans — a designer ceiling fan with bold brown and white contrast, copper motor, and wide airflow coverage for modern bedrooms and living rooms.'
   },
   {
-    id: 'elite-series', name: 'Elite Series', sku: 'MF-1003', price: 10500, oldPrice: 14000, discount: '25% OFF', rating: 4.9, reviews: 32,
-    image: '/assets/elite-series.jpg', category: 'Designer', color: 'Pearl White', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A 52-inch designer ceiling fan engineered for maximum energy efficiency and whisper-quiet circulation. Consumes up to 50% less power, making it an ideal modern pick for bedrooms and drawing rooms in Pakistan.'
-  },
-  {
-    id: 'wooden-touch', name: 'Wooden Touch', sku: 'MF-1004', price: 10400, oldPrice: 13000, discount: '20% OFF', rating: 4.7, reviews: 17,
-    image: '/assets/wooden-touch.jpg', category: 'Natural', color: 'Walnut', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'Rich walnut wood tones paired with a high-performance copper motor. Delivers smooth, natural airflow and warm acoustic comfort for luxury bedrooms and study rooms across Pakistan.'
-  },
-  {
-    id: 'modern-gold', name: 'Modern Gold', sku: 'MF-1005', price: 11900, oldPrice: 14900, discount: '20% OFF', rating: 4.8, reviews: 12,
-    image: '/assets/modern-gold.jpg', category: 'Designer', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A sculptural champagne gold ceiling fan by Maqsood Fans with a wide 52-inch blade sweep. Combines eye-catching interior luxury with energy-saving airflow for open-plan Pakistani homes.'
-  },
-  {
-    id: 'sleek-white', name: 'Sleek White', sku: 'MF-1006', price: 9900, oldPrice: 11900, discount: '15% OFF', rating: 4.6, reviews: 9,
-    image: '/assets/sleek-white.jpg', category: 'Everyday', color: 'Snow White', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A clean, minimal 48-inch electric ceiling fan engineered for whisper-quiet performance. Built with durable electrical silicon steel and pure copper windings for everyday bedroom comfort.'
-  },
-  {
-    id: 'aura-living-52', name: 'Aura Living 52', sku: 'MF-DEMO-201', price: 12800, oldPrice: 15900, discount: '20% OFF', rating: 4.8, reviews: 27,
-    image: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', category: 'Premium', color: 'Champagne Gold', blades: '3 blade', size: '52 inch', stockStatus: 'in_stock', description: 'A premium 52-inch ceiling fan engineered for open-plan living rooms and drawing areas. Pairs a quiet copper motor with a warm champagne finish, low energy consumption, and wide air coverage.'
-  },
-  {
-    id: 'nordic-breeze-48', name: 'Nordic Breeze 48', sku: 'MF-DEMO-202', price: 9600, oldPrice: 11800, discount: '15% OFF', rating: 4.6, reviews: 14,
-    image: 'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', category: 'Designer', color: 'Snow White', blades: '4 blade', size: '48 inch', stockStatus: 'in_stock', description: 'A bright 4-blade modern ceiling fan designed for bedrooms and home offices. Delivers smooth, low-noise circulation with dependable electric efficiency and clean Scandinavian styling.'
-  },
-  {
-    id: 'heritage-air-56', name: 'Heritage Air 56', sku: 'MF-DEMO-203', price: 14500, oldPrice: 17900, discount: '30% OFF', rating: 4.9, reviews: 39,
-    image: 'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=80', image2: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1200&q=80', image3: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1200&q=80', image4: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=1200&q=80', category: 'Natural', color: 'Walnut', blades: '5 blade', size: '56 inch', stockStatus: 'out_of_stock', description: 'An expansive 56-inch architectural ceiling fan by Maqsood Fans built for large halls, drawing rooms, and high ceilings. Features heavy-duty copper winding for maximum air delivery across expansive spaces.'
+    id: 'flat-king', name: 'Flat King', sku: 'MF-204', price: 8400, oldPrice: 9660, discount: '15% OFF', rating: 5, reviews: 8,
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&w=1200&q=80',
+    image2: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+    image3: 'https://images.unsplash.com/photo-1565538810643-b5bdb714032a?auto=format&fit=crop&w=1200&q=80',
+    image4: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
+    category: 'Everyday', color: 'White / Gold', blades: '3 blade', size: '48 inch', stockStatus: 'in_stock',
+    description: 'Flat King by Maqsood Fans — an everyday ceiling fan with clean white and gold finish, energy-efficient copper motor, and smooth quiet airflow for bedrooms and everyday spaces in Pakistan.'
   }
 ];
 
@@ -65,46 +56,17 @@ export const findProduct = (id) => products.find((product) => product.id === id)
 
 
 export const reviewsByProduct = {
-  'royal-plus': [
+  'lahore-model': [
     { name: 'Sana Malik', date: '2 weeks ago', rating: 5, text: 'The airflow is strong but quiet, and the ivory finish looks beautiful in our lounge.' },
-    { name: 'Hamza R.', date: '1 month ago', rating: 5, text: 'Delivery was smooth and the fan feels much more premium than I expected at this price.' },
-    { name: 'Nimra A.', date: '2 months ago', rating: 4, text: 'Lovely design and easy to use remote. It cools our bedroom quickly.' }
+    { name: 'Hamza R.', date: '1 month ago', rating: 5, text: 'Delivery was smooth and the fan feels much more premium than I expected at this price.' }
   ],
-  'classic-pro': [
-    { name: 'Ayesha Khan', date: '2 weeks ago', rating: 5, text: 'The black and gold finish is exactly what our living room needed. Powerful airflow too.' },
+  'king-model': [
+    { name: 'Ayesha Khan', date: '2 weeks ago', rating: 5, text: 'The brown and white finish is exactly what our living room needed. Powerful airflow too.' },
     { name: 'Bilal Ahmed', date: '1 month ago', rating: 5, text: 'Looks elegant, runs quietly and was packed very well for delivery.' },
-    { name: 'Farah S.', date: '3 months ago', rating: 4, text: 'A stylish fan with great performance. The remote makes the six speeds easy to manage.' }
+    { name: 'Farah S.', date: '3 months ago', rating: 5, text: 'A stylish fan with great performance.' }
   ],
-  'elite-series': [
-    { name: 'Maryam T.', date: '3 weeks ago', rating: 5, text: 'Clean white look and excellent airflow. It brightened up our dining space.' },
-    { name: 'Usman K.', date: '2 months ago', rating: 5, text: 'Very quiet motor and noticeably lower power use than our old fan.' },
-    { name: 'Hira N.', date: '4 months ago', rating: 4, text: 'Beautiful finish and professional installation support.' }
-  ],
-  'wooden-touch': [
-    { name: 'Zainab R.', date: '1 week ago', rating: 5, text: 'The walnut blades add warmth to the room and the air movement is lovely.' },
-    { name: 'Omar F.', date: '2 months ago', rating: 5, text: 'Solid build quality with a smooth, quiet motor.' },
-    { name: 'Iqra M.', date: '5 months ago', rating: 4, text: 'Exactly as shown and a great fit for our neutral interior.' }
-  ],
-  'modern-gold': [
-    { name: 'Maha S.', date: '3 weeks ago', rating: 5, text: 'A gorgeous statement fan. Guests keep asking where we bought it.' },
-    { name: 'Rashid A.', date: '2 months ago', rating: 5, text: 'Strong performance and the gold details feel very refined.' },
-    { name: 'Nadia H.', date: '6 months ago', rating: 4, text: 'Modern, quiet and easy to operate.' }
-  ],
-  'sleek-white': [
-    { name: 'Anum B.', date: '1 month ago', rating: 5, text: 'Minimal and practical. Perfect for our study.' },
-    { name: 'Danish M.', date: '3 months ago', rating: 4, text: 'Quiet enough for night use and the white finish stays understated.' },
-    { name: 'Saira J.', date: '6 months ago', rating: 4, text: 'Good value and quick delivery.' }
-  ],
-  'aura-living-52': [
-    { name: 'Sana Malik', date: '1 week ago', rating: 5, text: 'The wide airflow feels premium and the gold finish looks beautiful in our lounge.' },
-    { name: 'Hamza R.', date: '3 weeks ago', rating: 5, text: 'Quiet motor and a very polished look.' }
-  ],
-  'nordic-breeze-48': [
-    { name: 'Mariam A.', date: '2 weeks ago', rating: 5, text: 'Clean white design and comfortable airflow for our bedroom.' },
-    { name: 'Usman K.', date: '1 month ago', rating: 4, text: 'Simple, quiet and easy to live with.' }
-  ],
-  'heritage-air-56': [
-    { name: 'Omar F.', date: '2 months ago', rating: 5, text: 'The larger size works perfectly in our open living room.' },
-    { name: 'Nadia H.', date: '4 months ago', rating: 5, text: 'Beautiful wood-inspired styling and strong airflow.' }
+  'flat-king': [
+    { name: 'Maryam T.', date: '3 weeks ago', rating: 5, text: 'Clean white look and excellent airflow. It brightened up our bedroom.' },
+    { name: 'Usman K.', date: '2 months ago', rating: 5, text: 'Very quiet motor and noticeably lower power use than our old fan.' }
   ]
 };
